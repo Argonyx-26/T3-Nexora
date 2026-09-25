@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { useState } from "react";
 import { AlertToaster, LiveStatus } from "../components/alerts";
 import { Shell } from "../components/Shell";
@@ -65,10 +64,9 @@ export default function Demo() {
                   key={sp}
                   type="button"
                   onClick={() => run(`speed ${sp}`, () => api.setSpeed(sp))}
-                  className={cx("relative h-10 rounded-full px-5 font-mono text-[13px] transition-colors", sim?.speed === sp ? "text-bg" : "text-muted hover:text-ink")}
+                  className={cx("h-10 rounded-full px-5 font-mono text-[13px] transition-colors duration-200", sim?.speed === sp ? "bg-ink text-bg" : "text-muted hover:text-ink")}
                 >
-                  {sim?.speed === sp && <motion.span layoutId="speed-pill" className="absolute inset-0 rounded-full bg-ink" />}
-                  <span className="relative">{sp}×</span>
+                  {sp}×
                 </button>
               ))}
             </div>

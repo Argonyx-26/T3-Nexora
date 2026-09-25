@@ -89,9 +89,8 @@ export function PatientHome() {
           <Link to="/patient" className="text-[13px] text-muted hover:text-ink">← {l === "hi" ? "नाम बदलें" : "Not you?"}</Link>
           <div className="flex rounded-full border border-line p-1" role="group" aria-label="Language">
             {(["en", "hi"] as Lang[]).map((x) => (
-              <button key={x} type="button" onClick={() => setLang(x)} className={cx("relative h-8 rounded-full px-4 text-[13px]", l === x ? "text-bg" : "text-muted hover:text-ink")}>
-                {l === x && <motion.span layoutId="lang-pill" className="absolute inset-0 rounded-full bg-ink" />}
-                <span className="relative">{x === "en" ? "English" : "हिंदी"}</span>
+              <button key={x} type="button" onClick={() => setLang(x)} className={cx("h-8 rounded-full px-4 text-[13px] transition-colors duration-200", l === x ? "bg-ink text-bg" : "text-muted hover:text-ink")}>
+                {x === "en" ? "English" : "हिंदी"}
               </button>
             ))}
           </div>
