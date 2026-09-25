@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AlertItem, Medication, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
+import type { AlertItem, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "http://127.0.0.1:8000";
 
@@ -41,8 +41,10 @@ export const api = {
   alerts: (status = "open", s?: AbortSignal) => get<AlertItem[]>(`/alerts?status=${status}`, s),
   ack: (id: number, note: string, by = "Doctor") => post<AlertItem>(`/alerts/${id}/ack`, { note, by }),
   resolve: (id: number, note = "", by = "Doctor") => post<AlertItem>(`/alerts/${id}/resolve`, { note, by }),
-  reportSymptoms: (id: string, symptoms: string[], source = "patient", note = "") => post<Risk>(`/patients/${id}/symptoms`, { symptoms, source, note }),
+  reportSymptoms: (id: string, symptoms: string[], source: ReadingSource = "patient", note = "") => post<Risk>(`/patients/${id}/symptoms`, { symptoms, source, note }),
   recordDose: (doseId: number, status: "taken" | "missed") => post<Risk>("/doses", { dose_id: doseId, status }),
+  explanation: (id: string, lang: "en" | "hi", s?: AbortSignal) => get<Explanation>(`/patients/${id}/explanation?lang=${lang}`, s),
+  logVitals: (id: string, values: VitalsInput, source: ReadingSource = "patient") => post<Risk>(`/patients/${id}/vitals`, { ...values, source }),
   sim: (s?: AbortSignal) => get<SimState>("/sim", s),
   scenarios: (s?: AbortSignal) => get<ScenarioInfo[]>("/sim/scenarios", s),
   startScenario: (patient_id: string, scenario: string) => post<SimState>("/sim/scenario", { patient_id, scenario }),

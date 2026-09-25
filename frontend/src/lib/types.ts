@@ -175,3 +175,20 @@ export interface SymptomLog {
   note: string;
   resolved_at: string | null;
 }
+
+export interface Explanation {
+  patient_id: string;
+  lang: "en" | "hi";
+  level: Level;
+  score: number;
+  doctor: string;
+  patient: string;
+  urgency: string;
+  source: "gemini" | "template";
+  model: string | null;
+  generated_at: string;
+  disclaimer: string;
+}
+
+export type ReadingSource = "patient" | "asha" | "staff";
+export type VitalsInput = Partial<Record<"hr" | "spo2" | "sbp" | "dbp" | "rr" | "temp" | "glucose", number>>;

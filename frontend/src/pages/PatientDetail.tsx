@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertCard, AlertToaster, LiveStatus } from "../components/alerts";
+import { ExplanationCard } from "../components/ExplanationCard";
 import { Shell } from "../components/Shell";
 import { VitalChart } from "../components/VitalChart";
 import { Card, EmptyState, ErrorState, Eyebrow, RiskBadge, Skeleton, cx } from "../components/ui";
@@ -138,6 +139,10 @@ export default function PatientDetail() {
           <FactorsCard risk={r} />
         </div>
 
+        <div className="mt-4">
+          <ExplanationCard patientId={id} level={r?.level} score={r?.score} />
+        </div>
+
         {/* Vitals */}
         <section className="mt-14">
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -148,9 +153,8 @@ export default function PatientDetail() {
             </div>
             <div className="flex gap-1 rounded-full border border-line p-1">
               {RANGES.map((rg) => (
-                <button key={rg} type="button" onClick={() => setRange(rg)} className={cx("relative h-8 rounded-full px-4 font-mono text-[12px] transition-colors", range === rg ? "text-bg" : "text-muted hover:text-ink")}>
-                  {range === rg && <motion.span layoutId="range-pill" className="absolute inset-0 rounded-full bg-ink" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
-                  <span className="relative">{rg}</span>
+                <button key={rg} type="button" onClick={() => setRange(rg)} className={cx("h-8 rounded-full px-4 font-mono text-[12px] transition-colors duration-200", range === rg ? "bg-ink text-bg" : "text-muted hover:text-ink")}>
+                  {rg}
                 </button>
               ))}
             </div>
