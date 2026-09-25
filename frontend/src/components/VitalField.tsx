@@ -268,11 +268,31 @@ export function VitalField({ className }: { className?: string }) {
       }
     };
 
+    // Fade the top and left edges inside the canvas itself, so it melts into any page background
+    // (overlays in the page colour showed as bands over the aurora; CSS masks drop the canvas in Chromium).
+    const fadeEdges = () => {
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-in";
+      const v = ctx.createLinearGradient(0, 0, 0, h);
+      v.addColorStop(0, "rgba(0,0,0,0)");
+      v.addColorStop(0.34, "rgba(0,0,0,1)");
+      ctx.fillStyle = v;
+      ctx.fillRect(0, 0, w, h);
+      const l = ctx.createLinearGradient(0, 0, w, 0);
+      l.addColorStop(0, "rgba(0,0,0,0)");
+      l.addColorStop(0.3, "rgba(0,0,0,0.3)");
+      l.addColorStop(0.62, "rgba(0,0,0,1)");
+      ctx.fillStyle = l;
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    };
+
     const render = (t: number) => {
       ctx.clearRect(0, 0, w, h);
       drawGrid();
       drawWard(t);
       drawTrace(t);
+      fadeEdges();
       updateReadout(t);
     };
 
