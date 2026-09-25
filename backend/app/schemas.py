@@ -224,6 +224,9 @@ class SymptomsIn(BaseModel):
     symptoms: list[str]
     note: str = ""
     source: str = "patient"  # "patient" | "asha" | "staff"
+    severity: Literal["", "mild", "moderate", "severe"] = ""
+    duration: Literal["", "today", "days", "week"] = ""
+    frequency: Literal["", "once", "on_off", "constant"] = ""
 
 
 class DoseIn(BaseModel):
@@ -241,6 +244,48 @@ class SymptomLogOut(BaseModel):
     source: str
     note: str
     resolved_at: UTC | None
+    severity: str = ""
+    duration: str = ""
+    frequency: str = ""
+
+
+class CheckinIn(BaseModel):
+    mood: int = Field(ge=1, le=5)
+    energy: int = Field(ge=1, le=3)
+    sleep: int = Field(ge=1, le=3)
+    note: str = Field("", max_length=300)
+    symptoms: list[str] = Field(default_factory=list, max_length=10)
+    source: Literal["patient", "asha", "staff"] = "patient"
+
+
+class CheckinOut(BaseModel):
+    id: int
+    ts: UTC
+    mood: int
+    energy: int
+    sleep: int
+    note: str
+    source: str
+
+
+class TimelineEvent(BaseModel):
+    """One moment in a patient's health story. The client writes the words (English or Hindi)."""
+
+    ts: UTC
+    kind: Literal["status", "symptom", "dose", "reading", "alert", "checkin"]
+    sub: str = ""  # status: the new level · dose: taken/delayed/missed · alert: raised/escalated/acknowledged/resolved
+    level: str | None = None
+    prev_level: str | None = None
+    symptom: str | None = None
+    label_en: str | None = None
+    label_hi: str | None = None
+    severity: str = ""
+    medicine: str | None = None
+    values: dict[str, float] = Field(default_factory=dict)
+    source: str = ""
+    note: str = ""
+    by: str = ""
+    mood: int | None = None
 
 
 # --- Phase 4: explanations, manual readings ------------------------------------------

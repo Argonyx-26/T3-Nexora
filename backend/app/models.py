@@ -71,6 +71,24 @@ class SymptomReport(SQLModel, table=True):
     note: str = ""
     source: str = "patient"  # "patient" | "asha" | "staff" | "sim"
     resolved_at: NaiveDatetime | None = None  # set when the patient recovers; kept for the log
+    severity: str = ""  # "" | "mild" | "moderate" | "severe" — patient-reported, for the log and trends
+    duration: str = ""  # "" | "today" | "days" | "week" (under a day / 1–3 days / longer)
+    frequency: str = ""  # "" | "once" | "on_off" | "constant"
+
+
+class DailyCheckin(SQLModel, table=True):
+    """A quick daily check-in from the patient (or an ASHA worker): how they feel, in a few taps."""
+
+    __table_args__ = (Index("ix_checkin_patient_ts", "patient_id", "ts"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    patient_id: str = Field(foreign_key="patient.id")
+    ts: NaiveDatetime
+    mood: int  # 1 (awful) … 5 (great)
+    energy: int  # 1 low · 2 okay · 3 good
+    sleep: int  # 1 poor · 2 okay · 3 good
+    note: str = ""
+    source: str = "patient"
 
 
 class RiskSnapshot(SQLModel, table=True):

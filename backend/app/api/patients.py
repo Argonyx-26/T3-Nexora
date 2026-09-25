@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
 from ..db import engine, get_session
-from ..models import DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
+from ..models import Alert, DailyCheckin, DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
 from ..risk import weights as W
 from ..risk.adherence import effective_status
 from ..risk.types import Dose
@@ -19,6 +19,9 @@ from ..explain.service import explainer
 from ..schemas import (
     ChatIn,
     ChatOut,
+    CheckinIn,
+    CheckinOut,
+    TimelineEvent,
     DoseOut,
     ExplanationOut,
     MedicationOut,
@@ -166,7 +169,7 @@ def symptom_log(patient_id: str, s: Session = Depends(get_session)):
         SymptomLogOut(id=r.id, ts=r.ts, symptom=r.symptom, label_en=W.SYMPTOMS.get(r.symptom, {}).get("en", r.symptom),
                       label_hi=W.SYMPTOMS.get(r.symptom, {}).get("hi", r.symptom),
                       red_flag=W.SYMPTOMS.get(r.symptom, {}).get("escalate", False), source=r.source, note=r.note,
-                      resolved_at=r.resolved_at)
+                      resolved_at=r.resolved_at, severity=r.severity, duration=r.duration, frequency=r.frequency)
         for r in rows
     ]
 
@@ -180,7 +183,8 @@ async def report_symptoms(patient_id: str, body: SymptomsIn):
         raise HTTPException(422, f"Unknown or empty symptoms: {unknown or '[]'}. Known: {sorted(W.SYMPTOMS)}")
     if body.source not in ("patient", "asha", "staff"):
         raise HTTPException(422, "source must be patient, asha or staff")
-    message = await asyncio.to_thread(sim.report_symptoms, patient_id, list(dict.fromkeys(body.symptoms)), body.source, body.note[:500])
+    details = {"severity": body.severity, "duration": body.duration, "frequency": body.frequency}
+    message = await asyncio.to_thread(sim.report_symptoms, patient_id, list(dict.fromkeys(body.symptoms)), body.source, body.note[:500], details)
     await hub.broadcast(message)
     return risk_out(patient_id, sim.get(patient_id).risk)
 
@@ -256,3 +260,121 @@ async def chat(patient_id: str, body: ChatIn):
     facts.history = [t.model_dump() for t in body.history]
     out = await assistant.reply(facts, body.message, body.lang)
     return ChatOut(**out, disclaimer=W.DISCLAIMER)
+
+
+# ---------------------------------------------------------------- daily check-ins
+
+
+@router.post("/{patient_id}/checkins", response_model=CheckinOut, summary="A quick daily check-in: mood, energy, sleep (+ optional symptoms)")
+async def add_checkin(patient_id: str, body: CheckinIn):
+    if sim.get(patient_id) is None:
+        raise HTTPException(404, f"No patient {patient_id}")
+    unknown = [k for k in body.symptoms if k not in W.SYMPTOMS]
+    if unknown:
+        raise HTTPException(422, f"Unknown symptoms: {unknown}")
+
+    def save() -> DailyCheckin:
+        with Session(engine) as s:
+            row = DailyCheckin(patient_id=patient_id, ts=sim.now, mood=body.mood, energy=body.energy, sleep=body.sleep,
+                               note=body.note.strip(), source=body.source)
+            s.add(row)
+            s.commit()
+            s.refresh(row)
+            return row
+
+    row = await asyncio.to_thread(save)
+    if body.symptoms:
+        message = await asyncio.to_thread(sim.report_symptoms, patient_id, list(dict.fromkeys(body.symptoms)), body.source,
+                                          "From the daily check-in")
+        await hub.broadcast(message)
+    return CheckinOut(**row.model_dump())
+
+
+@router.get("/{patient_id}/checkins", response_model=list[CheckinOut], summary="Daily check-ins, newest first")
+def list_checkins(patient_id: str, days: int = Query(7, ge=1, le=30), s: Session = Depends(get_session)):
+    get_patient(s, patient_id)
+    rows = s.exec(
+        select(DailyCheckin)
+        .where(DailyCheckin.patient_id == patient_id, DailyCheckin.ts >= sim.now - timedelta(days=days))
+        .order_by(col(DailyCheckin.ts).desc())
+    ).all()
+    return [CheckinOut(**r.model_dump()) for r in rows]
+
+
+# ---------------------------------------------------------------- personal health timeline
+
+LATE = timedelta(minutes=30)
+PERSIST = 3  # a level must hold this many readings to count as a change of status
+
+
+@router.get("/{patient_id}/timeline", response_model=list[TimelineEvent], summary="Important health events, newest first")
+def timeline(patient_id: str, hours: int = Query(48, ge=1, le=168), s: Session = Depends(get_session)):
+    get_patient(s, patient_id)
+    now = sim.now
+    since = now - timedelta(hours=hours)
+    events: list[TimelineEvent] = []
+
+    # Status changes: a new level that held for PERSIST readings, not a one-reading blip.
+    snaps = s.exec(
+        select(RiskSnapshot).where(RiskSnapshot.patient_id == patient_id, RiskSnapshot.ts >= since - timedelta(minutes=30))
+        .order_by(col(RiskSnapshot.ts))
+    ).all()
+    if snaps:
+        cur = snaps[0].level
+        run_level, run_start, run_len = None, None, 0
+        for r in snaps[1:]:
+            if r.level == cur:
+                run_level, run_len = None, 0
+                continue
+            if r.level == run_level:
+                run_len += 1
+            else:
+                run_level, run_start, run_len = r.level, r, 1
+            if run_len >= PERSIST:
+                if run_start.ts >= since:
+                    events.append(TimelineEvent(ts=run_start.ts, kind="status", sub=run_level, level=run_level, prev_level=cur,
+                                                values={"score": float(run_start.score), "news2": float(run_start.news2)}))
+                cur, run_level, run_len = run_level, None, 0
+
+    for r in s.exec(select(SymptomReport).where(SymptomReport.patient_id == patient_id, SymptomReport.ts >= since)).all():
+        meta = W.SYMPTOMS.get(r.symptom, {})
+        events.append(TimelineEvent(ts=r.ts, kind="symptom", symptom=r.symptom, label_en=meta.get("en", r.symptom),
+                                    label_hi=meta.get("hi", r.symptom), severity=r.severity, source=r.source, note=r.note,
+                                    level="Critical" if meta.get("escalate") else None))
+
+    meds = {m.id: m.name for m in s.exec(select(Medication).where(Medication.patient_id == patient_id)).all()}
+    doses = s.exec(
+        select(DoseEvent).where(DoseEvent.patient_id == patient_id, DoseEvent.scheduled_at >= since, DoseEvent.scheduled_at <= now)
+    ).all()
+    for d in doses:
+        status = effective_status(Dose(meds.get(d.medication_id, ""), d.scheduled_at, d.status), now)
+        if status == "pending":
+            continue
+        if status == "taken" and d.recorded_at and d.recorded_at - d.scheduled_at > LATE:
+            status = "delayed"
+        events.append(TimelineEvent(ts=d.recorded_at or d.scheduled_at, kind="dose", sub=status, medicine=meds.get(d.medication_id, "")))
+
+    manual = s.exec(
+        select(VitalReading).where(VitalReading.patient_id == patient_id, VitalReading.ts >= since,
+                                   col(VitalReading.source).in_(["patient", "asha", "staff"]))
+    ).all()
+    for v in manual:
+        events.append(TimelineEvent(ts=v.ts, kind="reading", source=v.source,
+                                    values={k: float(getattr(v, k)) for k in ("hr", "spo2", "sbp", "dbp", "temp") if getattr(v, k) is not None}))
+
+    for a in s.exec(select(Alert).where(Alert.patient_id == patient_id, Alert.created_at >= since - timedelta(hours=hours))).all():
+        if a.created_at >= since:
+            events.append(TimelineEvent(ts=a.created_at, kind="alert", sub="raised", level=a.level if not a.updated_at else a.prev_level or a.level))
+        if a.updated_at and a.updated_at >= since:
+            events.append(TimelineEvent(ts=a.updated_at, kind="alert", sub="escalated", level=a.level, prev_level=a.prev_level))
+        if a.acknowledged_at and a.acknowledged_at >= since:
+            events.append(TimelineEvent(ts=a.acknowledged_at, kind="alert", sub="acknowledged", level=a.level, note=a.note, by=a.acknowledged_by))
+        if a.resolved_at and a.resolved_at >= since:
+            events.append(TimelineEvent(ts=a.resolved_at, kind="alert", sub="resolved", level=a.level))
+
+    for c in s.exec(select(DailyCheckin).where(DailyCheckin.patient_id == patient_id, DailyCheckin.ts >= since)).all():
+        events.append(TimelineEvent(ts=c.ts, kind="checkin", mood=c.mood, values={"energy": float(c.energy), "sleep": float(c.sleep)},
+                                    note=c.note, source=c.source))
+
+    events.sort(key=lambda e: e.ts, reverse=True)
+    return events[:300]

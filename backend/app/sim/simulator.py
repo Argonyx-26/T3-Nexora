@@ -330,9 +330,9 @@ class Simulator:
                     row.status = d.status
                     row.recorded_at = self.now if d.status == "taken" else None
 
-    def _add_symptoms(self, ps: PState, s: Session, keys: list[str], source: str, note: str = "") -> None:
+    def _add_symptoms(self, ps: PState, s: Session, keys: list[str], source: str, note: str = "", details: dict | None = None) -> None:
         for key in keys:
-            row = SymptomReport(patient_id=ps.id, ts=self.now, symptom=key, source=source, note=note)
+            row = SymptomReport(patient_id=ps.id, ts=self.now, symptom=key, source=source, note=note, **(details or {}))
             s.add(row)
             s.flush()
             ps.symptoms.append(SymRec(id=row.id, ts=self.now, key=key))
@@ -457,11 +457,11 @@ class Simulator:
             return {"type": "update", "sim": self.state().model_dump(mode="json"),
                     "updates": [self._update(ps).model_dump(mode="json")], "new_alerts": new_alerts, "alert_updates": changed}
 
-    def report_symptoms(self, patient_id: str, keys: list[str], source: str, note: str) -> dict:
+    def report_symptoms(self, patient_id: str, keys: list[str], source: str, note: str, details: dict | None = None) -> dict:
         with self.lock:
             ps = self.states[patient_id]
             with Session(engine) as s:
-                self._add_symptoms(ps, s, keys, source=source, note=note)
+                self._add_symptoms(ps, s, keys, source=source, note=note, details=details)
                 s.commit()
             return self.reassess(patient_id)
 
