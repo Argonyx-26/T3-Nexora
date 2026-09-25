@@ -2,11 +2,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Shell } from "../components/Shell";
+import { Check, ClipboardList, Clock, HandHeart, Languages, NotebookPen, Pill, Send, TriangleAlert, UserRound } from "lucide-react";
+import { LEVEL_ICON, VITAL_ICON, ic } from "../components/icons";
 import { Card, EmptyState, ErrorState, Eyebrow, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
 import { DISCLAIMER, LEVEL_STYLE, RED_FLAG_SYMPTOMS, SYMPTOM_LABEL, fmtTime, fmtVital, initials, istDateKey } from "../lib/format";
 import { useLive } from "../lib/live";
-import type { Level, VitalsInput } from "../lib/types";
+import type { Level, VitalKey, VitalsInput } from "../lib/types";
 
 type Lang = "en" | "hi";
 
@@ -73,7 +75,7 @@ export function PatientPicker() {
   return (
     <Shell>
       <div className="mx-auto max-w-3xl px-4 pt-14 pb-24 sm:px-8">
-        <Eyebrow>Patient view · demo sign-in</Eyebrow>
+        <Eyebrow icon={UserRound}>Patient view · demo sign-in</Eyebrow>
         <h1 className="mt-3 font-display text-[clamp(44px,6vw,80px)] leading-none tracking-[-0.02em]">Who are you?</h1>
         <p className="mt-3 text-[15px] text-muted">Pick your name to see your status. <span className="text-ink-2">अपना नाम चुनें।</span></p>
         <div className="mt-10 divide-y divide-line border-y border-line">
@@ -142,11 +144,13 @@ export function PatientHome() {
               type="button"
               onClick={() => setAsha((a) => !a)}
               aria-pressed={asha}
-              className={cx("h-10 rounded-full border px-4 text-[13px] transition-colors", asha ? "border-teal bg-teal-soft text-teal" : "border-line text-muted hover:text-ink")}
+              className={cx("inline-flex h-10 items-center gap-2 rounded-full border px-4 text-[13px] transition-colors", asha ? "border-teal bg-teal-soft text-teal" : "border-line text-muted hover:text-ink")}
             >
+              <HandHeart {...ic(15)} />
               {t.asha}
             </button>
-            <div className="flex rounded-full border border-line p-1" role="group" aria-label="Language">
+            <div className="flex items-center rounded-full border border-line p-1" role="group" aria-label="Language">
+              <Languages {...ic(14)} className="mx-2 text-muted" />
               {(["en", "hi"] as Lang[]).map((x) => (
                 <button key={x} type="button" onClick={() => setLang(x)} aria-pressed={l === x}
                   className={cx("h-8 rounded-full px-4 text-[13px] transition-colors duration-200", l === x ? "bg-ink text-bg" : "text-muted hover:text-ink")}>
@@ -161,7 +165,7 @@ export function PatientHome() {
           {asha && p && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
               className="mt-4 overflow-hidden rounded-2xl border border-teal/40 bg-teal-soft px-4 py-3 text-[14px] text-teal">
-              {t.ashaOn(p.name)}
+              <span className="flex items-center gap-2"><HandHeart {...ic(16)} className="shrink-0" />{t.ashaOn(p.name)}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -170,7 +174,8 @@ export function PatientHome() {
           <Skeleton className="mt-8 h-72 rounded-[28px]" />
         ) : (
           <motion.div key={l + p.risk.level} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className={cx("mt-8 rounded-[28px] p-8 sm:p-10", LEVEL_STYLE[p.risk.level].soft)}>
+            className={cx("relative mt-8 overflow-hidden rounded-[28px] p-8 sm:p-10", LEVEL_STYLE[p.risk.level].soft)}>
+            <StatusMark level={p.risk.level} />
             <div className="eyebrow">{t.hello}, {p.name.split(" ")[0]}</div>
             <h1 className={cx("mt-4 font-display text-[clamp(40px,6vw,68px)] leading-[1.02]", LEVEL_STYLE[p.risk.level].text)}>{status.title}</h1>
             <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink">
@@ -181,16 +186,16 @@ export function PatientHome() {
 
         {p && (
           <section className="mt-10">
-            <Eyebrow>{t.readings} · {fmtTime(p.latest.ts)}</Eyebrow>
+            <Eyebrow icon={Clock}>{t.readings} · {fmtTime(p.latest.ts)}</Eyebrow>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                [t.hr, fmtVital("hr", p.latest.hr), "bpm"],
-                [t.spo2, fmtVital("spo2", p.latest.spo2), "%"],
-                [t.bp, `${fmtVital("sbp", p.latest.sbp)}/${fmtVital("dbp", p.latest.dbp)}`, "mmHg"],
-                [t.temp, fmtVital("temp", p.latest.temp), "°C"],
-              ].map(([label, value, unit]) => (
+              {([
+                ["hr", t.hr, fmtVital("hr", p.latest.hr), "bpm"],
+                ["spo2", t.spo2, fmtVital("spo2", p.latest.spo2), "%"],
+                ["sbp", t.bp, `${fmtVital("sbp", p.latest.sbp)}/${fmtVital("dbp", p.latest.dbp)}`, "mmHg"],
+                ["temp", t.temp, fmtVital("temp", p.latest.temp), "°C"],
+              ] as const).map(([key, label, value, unit]) => (
                 <Card key={label} className="px-4 py-4">
-                  <div className="text-[12px] text-muted">{label}</div>
+                  <div className="flex items-center gap-1.5 text-[12px] text-muted"><VitalIcon k={key} />{label}</div>
                   <div className="mt-1 font-mono text-[24px] leading-none tnum">{value}<span className="ml-1 text-[11px] text-muted">{unit}</span></div>
                 </Card>
               ))}
@@ -199,7 +204,7 @@ export function PatientHome() {
         )}
 
         <section className="mt-10">
-          <Eyebrow>{t.meds}</Eyebrow>
+          <Eyebrow icon={Pill}>{t.meds}</Eyebrow>
           <div className="mt-4">
             {meds.error && !meds.data ? <ErrorState error={meds.error} onRetry={meds.reload} /> : !todays ? <Skeleton className="h-32" /> : todays.length === 0 ? (
               <EmptyState title={t.none} />
@@ -219,7 +224,7 @@ export function PatientHome() {
         {p && <SymptomChecklist patientId={id} source={source} lang={l} t={t} onSent={() => patient.reload()} />}
 
         <section className="mt-10 rounded-3xl border border-dashed border-line-2 p-6">
-          <div className="eyebrow text-teal">{t.asha}</div>
+          <div className="eyebrow flex items-center gap-2 text-teal"><HandHeart {...ic(14)} />{t.asha}</div>
           <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{t.ashaBody}</p>
         </section>
         <p className="mt-8 text-[12px] leading-relaxed text-muted">{DISCLAIMER}</p>
@@ -229,6 +234,26 @@ export function PatientHome() {
 }
 
 type Texts = (typeof T)["en"];
+
+function VitalIcon({ k }: { k: VitalKey }) {
+  const Icon = VITAL_ICON[k];
+  return <Icon {...ic(13)} className="shrink-0" />;
+}
+
+/** The status card's big, slowly breathing mark: a tick when fine, a siren when not. */
+function StatusMark({ level }: { level: Level }) {
+  const Icon = LEVEL_ICON[level];
+  return (
+    <motion.span
+      aria-hidden
+      className={cx("pointer-events-none absolute -right-8 -bottom-10 sm:right-6 sm:bottom-5", LEVEL_STYLE[level].text)}
+      animate={{ scale: [1, 1.06, 1], opacity: [0.18, 0.28, 0.18] }}
+      transition={{ duration: level === "Stable" ? 5 : 1.8, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <Icon size={112} strokeWidth={1.1} />
+    </motion.span>
+  );
+}
 
 function DoseRow({ name, dose, purpose, time, status, canMark, t, onMark }: {
   name: string; dose: string; purpose: string; time: string; status: string; canMark: boolean; t: Texts; onMark: () => Promise<void>;
@@ -258,15 +283,17 @@ function DoseRow({ name, dose, purpose, time, status, canMark, t, onMark }: {
               setBusy(false);
             }
           }}
-          className="h-10 rounded-full bg-ink px-5 text-[13px] font-medium text-bg transition-colors hover:bg-teal disabled:opacity-60"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-medium text-bg transition-colors hover:bg-teal disabled:opacity-60"
         >
+          <Check {...ic(15)} />
           {busy ? t.saving : t.markTaken}
         </button>
       ) : (
-        <span className={cx("rounded-full px-3 py-1 text-[12px]",
+        <span className={cx("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px]",
           status === "taken" && "bg-teal-soft text-teal",
           status === "missed" && "bg-critical-soft text-critical",
           status === "pending" && "border border-line-2 text-muted")}>
+          {status === "taken" && <Check {...ic(13)} />}
           {status === "taken" ? t.taken : status === "missed" ? t.missed : t.due}
         </span>
       )}
@@ -309,13 +336,13 @@ function LogReading({ patientId, source, t, onSaved }: { patientId: string; sour
 
   return (
     <section className="mt-10">
-      <Eyebrow>{t.logTitle}</Eyebrow>
+      <Eyebrow icon={NotebookPen}>{t.logTitle}</Eyebrow>
       <form onSubmit={submit} className="mt-4 rounded-3xl border border-line bg-surface p-5" noValidate>
         <p className="text-[13px] text-muted">{t.logHint}</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {FIELDS.map((f) => (
             <label key={f.key} className="block">
-              <span className="text-[12px] text-muted">{f.label(t)}</span>
+              <span className="flex items-center gap-1.5 text-[12px] text-muted"><VitalIcon k={f.key} />{f.label(t)}</span>
               <div className="mt-1 flex items-center rounded-xl border border-line bg-bg focus-within:border-line-2">
                 <input
                   inputMode="decimal"
@@ -378,7 +405,7 @@ function SymptomChecklist({ patientId, source, lang, t, onSent }: { patientId: s
 
   return (
     <section className="mt-10">
-      <Eyebrow>{t.feel}</Eyebrow>
+      <Eyebrow icon={ClipboardList}>{t.feel}</Eyebrow>
       <div className="mt-4 rounded-3xl border border-line bg-surface p-5">
         <p className="text-[13px] text-muted">{t.feelHint}</p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -403,10 +430,14 @@ function SymptomChecklist({ patientId, source, lang, t, onSent }: { patientId: s
           })}
         </div>
         {(redPicked || state.redFlag) && (
-          <div className="mt-4 rounded-2xl bg-critical-soft px-4 py-3 text-[14px] font-medium text-critical" role="alert">{t.redflag}</div>
+          <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-critical-soft px-4 py-3 text-[14px] font-medium text-critical" role="alert">
+            <TriangleAlert {...ic(18)} className="mt-px shrink-0" />
+            {t.redflag}
+          </div>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={send} disabled={state.kind === "busy"} className="h-11 rounded-full bg-ink px-6 text-[14px] font-medium text-bg transition-colors hover:bg-teal disabled:opacity-60">
+          <button type="button" onClick={send} disabled={state.kind === "busy"} className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-6 text-[14px] font-medium text-bg transition-colors hover:bg-teal disabled:opacity-60">
+            <Send {...ic(15)} />
             {state.kind === "busy" ? t.saving : t.send}
           </button>
           {state.msg && <span className={cx("text-[13px]", state.kind === "error" ? "text-critical" : "text-stable")} role="status">{state.msg}</span>}
