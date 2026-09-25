@@ -45,6 +45,9 @@ export const SYMPTOM_LABEL: Record<string, { en: string; hi: string }> = {
   fatigue: { en: "Unusual tiredness", hi: "असामान्य थकान" },
 };
 
+/** Symptoms that escalate at once (mirrors backend risk/weights.py). */
+export const RED_FLAG_SYMPTOMS = new Set(["chest_pain", "one_sided_weakness", "slurred_speech", "fainting", "confusion", "coughing_blood"]);
+
 export function fmtVital(key: VitalKey, v: number | null | undefined): string {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
   return v.toFixed(VITALS[key].decimals);

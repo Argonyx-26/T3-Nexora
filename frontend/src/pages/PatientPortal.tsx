@@ -1,11 +1,12 @@
-import { motion } from "framer-motion";
-import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Shell } from "../components/Shell";
 import { Card, EmptyState, ErrorState, Eyebrow, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
-import { DISCLAIMER, LEVEL_STYLE, fmtTime, fmtVital, initials, istDateKey } from "../lib/format";
-import type { Level } from "../lib/types";
+import { DISCLAIMER, LEVEL_STYLE, RED_FLAG_SYMPTOMS, SYMPTOM_LABEL, fmtTime, fmtVital, initials, istDateKey } from "../lib/format";
+import { useLive } from "../lib/live";
+import type { Level, VitalsInput } from "../lib/types";
 
 type Lang = "en" | "hi";
 
@@ -29,9 +30,43 @@ const STATUS: Record<Level, Record<Lang, { title: string; body: string }>> = {
 };
 
 const T = {
-  en: { hello: "Namaste", readings: "Your latest readings", meds: "Today's medicines", taken: "Taken", missed: "Missed", due: "Due", none: "No medicines scheduled today.", asha: "ASHA worker mode", ashaBody: "Health workers can use this same screen on a shared phone to check on patients in villages, in Hindi or English.", hr: "Heart rate", spo2: "Oxygen", bp: "Blood pressure", temp: "Temperature" },
-  hi: { hello: "नमस्ते", readings: "आपकी ताज़ा रीडिंग", meds: "आज की दवाइयाँ", taken: "ली गई", missed: "छूट गई", due: "लेनी है", none: "आज कोई दवा नहीं है।", asha: "आशा कार्यकर्ता मोड", ashaBody: "स्वास्थ्य कार्यकर्ता इसी स्क्रीन से गाँव में मरीज़ों की जाँच कर सकते हैं — हिंदी या अंग्रेज़ी में।", hr: "धड़कन", spo2: "ऑक्सीजन", bp: "ब्लड प्रेशर", temp: "तापमान" },
+  en: {
+    hello: "Namaste", readings: "Your latest readings", meds: "Today's medicines", taken: "Taken", missed: "Missed", due: "Due",
+    markTaken: "Mark as taken", saving: "Saving…", none: "No medicines scheduled today.",
+    asha: "ASHA worker mode", ashaOn: (n: string) => `Recording for ${n} as an ASHA worker`,
+    ashaBody: "Health workers can use this same screen on a shared phone to check on patients in villages, in Hindi or English. Readings and symptoms they enter are marked as recorded by an ASHA worker.",
+    hr: "Heart rate", spo2: "Oxygen", bp: "Blood pressure", sys: "Top (systolic)", dia: "Bottom (diastolic)", temp: "Temperature", glucose: "Blood sugar",
+    logTitle: "Log a reading", logHint: "Fill in only what you measured. Temperature in °C or °F.", save: "Save reading",
+    saved: "Saved — your care team can see it.", needOne: "Enter at least one reading.", outOfRange: (f: string) => `${f} looks out of range — please check it.`,
+    feel: "How are you feeling?", feelHint: "Tick anything you have right now.", send: "Send to my care team",
+    sent: "Sent — your care team can see it.", pickOne: "Tick at least one symptom.",
+    redflag: "This can be serious. Please tell a nurse or call for help now.", notYou: "Not you?",
+  },
+  hi: {
+    hello: "नमस्ते", readings: "आपकी ताज़ा रीडिंग", meds: "आज की दवाइयाँ", taken: "ली गई", missed: "छूट गई", due: "लेनी है",
+    markTaken: "ले ली", saving: "सेव हो रहा है…", none: "आज कोई दवा नहीं है।",
+    asha: "आशा कार्यकर्ता मोड", ashaOn: (n: string) => `आशा कार्यकर्ता के रूप में ${n} के लिए दर्ज कर रहे हैं`,
+    ashaBody: "स्वास्थ्य कार्यकर्ता इसी स्क्रीन से गाँव में मरीज़ों की जाँच कर सकते हैं — हिंदी या अंग्रेज़ी में। उनके द्वारा दर्ज रीडिंग और लक्षण 'आशा कार्यकर्ता' के नाम से दिखते हैं।",
+    hr: "धड़कन", spo2: "ऑक्सीजन", bp: "ब्लड प्रेशर", sys: "ऊपर वाला (सिस्टोलिक)", dia: "नीचे वाला (डायस्टोलिक)", temp: "तापमान", glucose: "ब्लड शुगर",
+    logTitle: "रीडिंग दर्ज करें", logHint: "सिर्फ़ वही भरें जो आपने नापा है। तापमान °C या °F में।", save: "रीडिंग सेव करें",
+    saved: "सेव हो गया — आपकी देखभाल टीम इसे देख सकती है।", needOne: "कम से कम एक रीडिंग भरें।", outOfRange: (f: string) => `${f} सही नहीं लग रहा — कृपया जाँच लें।`,
+    feel: "आप कैसा महसूस कर रहे हैं?", feelHint: "अभी जो भी तकलीफ़ है, उस पर टिक करें।", send: "देखभाल टीम को भेजें",
+    sent: "भेज दिया — आपकी देखभाल टीम इसे देख सकती है।", pickOne: "कम से कम एक लक्षण चुनें।",
+    redflag: "यह गंभीर हो सकता है। कृपया अभी नर्स को बताएं या मदद बुलाएं।", notYou: "नाम बदलें",
+  },
 };
+
+type FieldKey = "hr" | "spo2" | "sbp" | "dbp" | "temp" | "glucose";
+const FIELDS: { key: FieldKey; label: (t: (typeof T)["en"]) => string; unit: string; min: number; max: number; step: string }[] = [
+  { key: "hr", label: (t) => t.hr, unit: "bpm", min: 20, max: 250, step: "1" },
+  { key: "spo2", label: (t) => t.spo2, unit: "%", min: 50, max: 100, step: "1" },
+  { key: "sbp", label: (t) => `${t.bp} · ${t.sys}`, unit: "mmHg", min: 50, max: 260, step: "1" },
+  { key: "dbp", label: (t) => `${t.bp} · ${t.dia}`, unit: "mmHg", min: 30, max: 160, step: "1" },
+  { key: "temp", label: (t) => t.temp, unit: "°C / °F", min: 32, max: 43, step: "0.1" },
+  { key: "glucose", label: (t) => t.glucose, unit: "mg/dL", min: 20, max: 600, step: "1" },
+];
+
+const SYMPTOM_ORDER = Object.keys(SYMPTOM_LABEL).sort((a, b) => Number(RED_FLAG_SYMPTOMS.has(b)) - Number(RED_FLAG_SYMPTOMS.has(a)));
 
 export function PatientPicker() {
   const patients = useQuery((s) => api.patients(s), []);
@@ -66,12 +101,27 @@ export function PatientPicker() {
 
 export function PatientHome() {
   const { id = "" } = useParams();
-  const patient = useQuery((s) => api.patient(id, s), [id], 15_000);
-  const meds = useQuery((s) => api.medications(id, s), [id], 30_000);
+  const patient = useQuery((s) => api.patient(id, s), [id], 30_000);
+  const meds = useQuery((s) => api.medications(id, s), [id], 60_000);
   const [lang, setLang] = useState<Lang | null>(null);
+  const [asha, setAsha] = useState(false);
   const p = patient.data;
   const l: Lang = lang ?? p?.language ?? "en";
   const t = T[l];
+  const source = asha ? "asha" : "patient";
+
+  // Live: the status follows the ward stream; the plain sentence comes from the explainer.
+  const live = useLive();
+  const tick = live.patients[id]?.vitals.ts;
+  const lastReload = useRef(0);
+  useEffect(() => {
+    if (!tick || Date.now() - lastReload.current < 3000) return;
+    lastReload.current = Date.now();
+    patient.reload();
+  }, [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const level = p?.risk.level;
+  const bucket = p ? Math.floor(p.risk.score / 5) : -1;
+  const explanation = useQuery((s) => api.explanation(id, l, s), [id, l, level, bucket]);
 
   if (patient.error && !p) {
     return <Shell><div className="mx-auto max-w-xl px-4 py-24"><ErrorState error={patient.error} onRetry={patient.reload} /></div></Shell>;
@@ -85,25 +135,47 @@ export function PatientHome() {
   return (
     <Shell>
       <div lang={l} className="mx-auto max-w-3xl px-4 pt-10 pb-24 sm:px-8">
-        <div className="flex items-center justify-between">
-          <Link to="/patient" className="text-[13px] text-muted hover:text-ink">← {l === "hi" ? "नाम बदलें" : "Not you?"}</Link>
-          <div className="flex rounded-full border border-line p-1" role="group" aria-label="Language">
-            {(["en", "hi"] as Lang[]).map((x) => (
-              <button key={x} type="button" onClick={() => setLang(x)} className={cx("h-8 rounded-full px-4 text-[13px] transition-colors duration-200", l === x ? "bg-ink text-bg" : "text-muted hover:text-ink")}>
-                {x === "en" ? "English" : "हिंदी"}
-              </button>
-            ))}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link to="/patient" className="text-[13px] text-muted hover:text-ink">← {t.notYou}</Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAsha((a) => !a)}
+              aria-pressed={asha}
+              className={cx("h-10 rounded-full border px-4 text-[13px] transition-colors", asha ? "border-teal bg-teal-soft text-teal" : "border-line text-muted hover:text-ink")}
+            >
+              {t.asha}
+            </button>
+            <div className="flex rounded-full border border-line p-1" role="group" aria-label="Language">
+              {(["en", "hi"] as Lang[]).map((x) => (
+                <button key={x} type="button" onClick={() => setLang(x)} aria-pressed={l === x}
+                  className={cx("h-8 rounded-full px-4 text-[13px] transition-colors duration-200", l === x ? "bg-ink text-bg" : "text-muted hover:text-ink")}>
+                  {x === "en" ? "English" : "हिंदी"}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
+        <AnimatePresence>
+          {asha && p && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+              className="mt-4 overflow-hidden rounded-2xl border border-teal/40 bg-teal-soft px-4 py-3 text-[14px] text-teal">
+              {t.ashaOn(p.name)}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {!p || !status ? (
-          <Skeleton className="mt-10 h-72 rounded-[28px]" />
+          <Skeleton className="mt-8 h-72 rounded-[28px]" />
         ) : (
           <motion.div key={l + p.risk.level} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className={cx("mt-10 rounded-[28px] p-8 sm:p-10", LEVEL_STYLE[p.risk.level].soft)}>
+            className={cx("mt-8 rounded-[28px] p-8 sm:p-10", LEVEL_STYLE[p.risk.level].soft)}>
             <div className="eyebrow">{t.hello}, {p.name.split(" ")[0]}</div>
-            <h1 className={cx("mt-4 font-display text-[clamp(40px,6vw,68px)] leading-[1.02] tracking-[-0.015em]", LEVEL_STYLE[p.risk.level].text)}>{status.title}</h1>
-            <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink">{status.body}</p>
+            <h1 className={cx("mt-4 font-display text-[clamp(40px,6vw,68px)] leading-[1.02]", LEVEL_STYLE[p.risk.level].text)}>{status.title}</h1>
+            <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink">
+              {explanation.data?.lang === l && explanation.data.level === p.risk.level ? explanation.data.patient : status.body}
+            </p>
           </motion.div>
         )}
 
@@ -134,24 +206,17 @@ export function PatientHome() {
             ) : (
               <div className="divide-y divide-line rounded-3xl border border-line bg-surface">
                 {todays.map(({ m, d }) => (
-                  <div key={d.id} className="flex items-center gap-4 px-5 py-4">
-                    <span className="w-14 font-mono text-[14px] tnum text-muted">{fmtTime(d.scheduled_at)}</span>
-                    <div className="flex-1">
-                      <div className="text-[15px] font-medium">{m.name} <span className="font-normal text-muted">{m.dose}</span></div>
-                      <div className="text-[12px] text-muted">{m.purpose}</div>
-                    </div>
-                    <span className={cx("rounded-full px-3 py-1 text-[12px]",
-                      d.status === "taken" && "bg-teal-soft text-teal",
-                      d.status === "missed" && "bg-critical-soft text-critical",
-                      d.status === "pending" && "border border-line-2 text-muted")}>
-                      {d.status === "taken" ? t.taken : d.status === "missed" ? t.missed : t.due}
-                    </span>
-                  </div>
+                  <DoseRow key={d.id} name={m.name} dose={m.dose} purpose={m.purpose} time={fmtTime(d.scheduled_at)} status={d.status}
+                    canMark={d.status === "pending" && p !== undefined && Date.parse(d.scheduled_at) <= Date.parse(p.latest.ts) + 60 * 60_000}
+                    t={t} onMark={async () => { await api.recordDose(d.id, "taken"); meds.reload(); patient.reload(); }} />
                 ))}
               </div>
             )}
           </div>
         </section>
+
+        {p && <LogReading patientId={id} source={source} t={t} onSaved={() => patient.reload()} />}
+        {p && <SymptomChecklist patientId={id} source={source} lang={l} t={t} onSent={() => patient.reload()} />}
 
         <section className="mt-10 rounded-3xl border border-dashed border-line-2 p-6">
           <div className="eyebrow text-teal">{t.asha}</div>
@@ -160,5 +225,193 @@ export function PatientHome() {
         <p className="mt-8 text-[12px] leading-relaxed text-muted">{DISCLAIMER}</p>
       </div>
     </Shell>
+  );
+}
+
+type Texts = (typeof T)["en"];
+
+function DoseRow({ name, dose, purpose, time, status, canMark, t, onMark }: {
+  name: string; dose: string; purpose: string; time: string; status: string; canMark: boolean; t: Texts; onMark: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  return (
+    <div className="flex flex-wrap items-center gap-4 px-5 py-4">
+      <span className="w-14 font-mono text-[14px] tnum text-muted">{time}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[15px] font-medium">{name} <span className="font-normal text-muted">{dose}</span></div>
+        <div className="text-[12px] text-muted">{purpose}</div>
+        {error && <div className="mt-1 text-[12px] text-critical">{error}</div>}
+      </div>
+      {canMark ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError(undefined);
+            try {
+              await onMark();
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="h-10 rounded-full bg-ink px-5 text-[13px] font-medium text-bg transition-colors hover:bg-teal disabled:opacity-60"
+        >
+          {busy ? t.saving : t.markTaken}
+        </button>
+      ) : (
+        <span className={cx("rounded-full px-3 py-1 text-[12px]",
+          status === "taken" && "bg-teal-soft text-teal",
+          status === "missed" && "bg-critical-soft text-critical",
+          status === "pending" && "border border-line-2 text-muted")}>
+          {status === "taken" ? t.taken : status === "missed" ? t.missed : t.due}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function LogReading({ patientId, source, t, onSaved }: { patientId: string; source: "patient" | "asha"; t: Texts; onSaved: () => void }) {
+  const [values, setValues] = useState<Partial<Record<FieldKey, string>>>({});
+  const [state, setState] = useState<{ kind: "idle" | "busy" | "ok" | "error"; msg?: string }>({ kind: "idle" });
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const out: VitalsInput = {};
+    for (const f of FIELDS) {
+      const raw = values[f.key]?.trim();
+      if (!raw) continue;
+      let n = Number(raw.replace(",", "."));
+      if (f.key === "temp" && n > 45) n = Math.round(((n - 32) * 5) / 9 * 10) / 10; // typed in °F
+      if (!Number.isFinite(n) || n < f.min || n > f.max) {
+        setState({ kind: "error", msg: t.outOfRange(f.label(t)) });
+        return;
+      }
+      out[f.key] = n;
+    }
+    if (Object.keys(out).length === 0) {
+      setState({ kind: "error", msg: t.needOne });
+      return;
+    }
+    setState({ kind: "busy" });
+    try {
+      await api.logVitals(patientId, out, source);
+      setValues({});
+      setState({ kind: "ok", msg: t.saved });
+      onSaved();
+    } catch (err) {
+      setState({ kind: "error", msg: (err as Error).message });
+    }
+  };
+
+  return (
+    <section className="mt-10">
+      <Eyebrow>{t.logTitle}</Eyebrow>
+      <form onSubmit={submit} className="mt-4 rounded-3xl border border-line bg-surface p-5" noValidate>
+        <p className="text-[13px] text-muted">{t.logHint}</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {FIELDS.map((f) => (
+            <label key={f.key} className="block">
+              <span className="text-[12px] text-muted">{f.label(t)}</span>
+              <div className="mt-1 flex items-center rounded-xl border border-line bg-bg focus-within:border-line-2">
+                <input
+                  inputMode="decimal"
+                  value={values[f.key] ?? ""}
+                  onChange={(e) => {
+                    setValues((v) => ({ ...v, [f.key]: e.target.value }));
+                    if (state.kind !== "busy") setState({ kind: "idle" });
+                  }}
+                  className="h-11 w-full bg-transparent px-3 font-mono text-[16px] outline-none"
+                  aria-label={f.label(t)}
+                />
+                <span className="pr-3 font-mono text-[11px] whitespace-nowrap text-muted">{f.unit}</span>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button type="submit" disabled={state.kind === "busy"} className="h-11 rounded-full bg-ink px-6 text-[14px] font-medium text-bg transition-colors hover:bg-teal disabled:opacity-60">
+            {state.kind === "busy" ? t.saving : t.save}
+          </button>
+          {state.msg && <span className={cx("text-[13px]", state.kind === "error" ? "text-critical" : "text-stable")} role="status">{state.msg}</span>}
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function SymptomChecklist({ patientId, source, lang, t, onSent }: { patientId: string; source: "patient" | "asha"; lang: Lang; t: Texts; onSent: () => void }) {
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [state, setState] = useState<{ kind: "idle" | "busy" | "ok" | "error"; msg?: string; redFlag?: boolean }>({ kind: "idle" });
+
+  const toggle = (k: string) => {
+    setPicked((s) => {
+      const n = new Set(s);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
+    if (state.kind !== "busy") setState({ kind: "idle" });
+  };
+
+  const send = async () => {
+    if (picked.size === 0) {
+      setState({ kind: "error", msg: t.pickOne });
+      return;
+    }
+    setState({ kind: "busy" });
+    try {
+      const list = [...picked];
+      await api.reportSymptoms(patientId, list, source);
+      setPicked(new Set());
+      setState({ kind: "ok", msg: t.sent, redFlag: list.some((k) => RED_FLAG_SYMPTOMS.has(k)) });
+      onSent();
+    } catch (err) {
+      setState({ kind: "error", msg: (err as Error).message });
+    }
+  };
+
+  const redPicked = [...picked].some((k) => RED_FLAG_SYMPTOMS.has(k));
+
+  return (
+    <section className="mt-10">
+      <Eyebrow>{t.feel}</Eyebrow>
+      <div className="mt-4 rounded-3xl border border-line bg-surface p-5">
+        <p className="text-[13px] text-muted">{t.feelHint}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {SYMPTOM_ORDER.map((k) => {
+            const on = picked.has(k);
+            const red = RED_FLAG_SYMPTOMS.has(k);
+            return (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggle(k)}
+                className={cx(
+                  "inline-flex h-10 items-center gap-2 rounded-full border px-4 text-[14px] transition-colors",
+                  on ? (red ? "border-critical bg-critical-soft text-critical" : "border-teal bg-teal-soft text-teal") : "border-line hover:border-line-2",
+                )}
+              >
+                {red && <span className="size-1.5 rounded-full bg-critical" aria-hidden />}
+                {SYMPTOM_LABEL[k][lang]}
+              </button>
+            );
+          })}
+        </div>
+        {(redPicked || state.redFlag) && (
+          <div className="mt-4 rounded-2xl bg-critical-soft px-4 py-3 text-[14px] font-medium text-critical" role="alert">{t.redflag}</div>
+        )}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button type="button" onClick={send} disabled={state.kind === "busy"} className="h-11 rounded-full bg-ink px-6 text-[14px] font-medium text-bg transition-colors hover:bg-teal disabled:opacity-60">
+            {state.kind === "busy" ? t.saving : t.send}
+          </button>
+          {state.msg && <span className={cx("text-[13px]", state.kind === "error" ? "text-critical" : "text-stable")} role="status">{state.msg}</span>}
+        </div>
+      </div>
+    </section>
   );
 }
