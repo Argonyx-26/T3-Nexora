@@ -225,6 +225,17 @@ body {
   background: color-mix(in srgb, var(--vf) 13%, transparent);
   transition: color 0.8s ease, background-color 0.8s ease;
 }
+@keyframes ayu-bell {
+  0%, 60%, 100% { transform: rotate(0); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-12deg); }
+  30% { transform: rotate(8deg); }
+  40% { transform: rotate(-5deg); }
+}
+.bell-ring {
+  transform-origin: 50% 10%;
+  animation: ayu-bell 2.4s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
-  .pulse-critical, .live-dot, .text-shine, .marquee { animation: none; }
+  .pulse-critical, .live-dot, .text-shine, .marquee, .bell-ring { animation: none; }
 }

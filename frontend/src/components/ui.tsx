@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { CloudOff, Inbox, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LEVEL_STYLE } from "../lib/format";
@@ -66,6 +67,7 @@ export function Skeleton({ className }: { className?: string }) {
 export function ErrorState({ error, onRetry }: { error: Error; onRetry?: () => void }) {
   return (
     <Card className="p-8 text-center">
+      <CloudOff size={28} strokeWidth={1.5} aria-hidden className="mx-auto mb-3 text-muted" />
       <div className="font-display text-3xl">Couldn't load this</div>
       <p className="mx-auto mt-2 max-w-md text-[14px] text-muted">{error.message}</p>
       {onRetry && (
@@ -77,9 +79,12 @@ export function ErrorState({ error, onRetry }: { error: Error; onRetry?: () => v
   );
 }
 
-export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
+export function EmptyState({ title, children, icon: Icon = Inbox }: { title: string; children?: ReactNode; icon?: LucideIcon }) {
   return (
     <div className="rounded-2xl border border-dashed border-line-2 px-6 py-10 text-center">
+      <span className="mx-auto mb-3 grid size-11 place-items-center rounded-full bg-surface-2 text-muted">
+        <Icon size={20} strokeWidth={1.6} aria-hidden />
+      </span>
       <div className="font-display text-2xl text-ink-2">{title}</div>
       {children && <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-muted">{children}</p>}
     </div>

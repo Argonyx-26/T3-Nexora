@@ -1,10 +1,12 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import { BellRing, Search, Siren, TriangleAlert, Users, type LucideIcon } from "lucide-react";
 import { forwardRef, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertToaster, AlertsPanel, LiveStatus } from "../components/alerts";
 import { Shell } from "../components/Shell";
 import { Sparkline } from "../components/Sparkline";
 import { spotlight } from "../components/motion";
+import { VITAL_ICON, ic } from "../components/icons";
 import { EmptyState, ErrorState, Eyebrow, LevelDot, RiskBadge, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
 import { useLive } from "../lib/live";
@@ -94,10 +96,10 @@ export default function Doctor() {
             )}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Kpi label="Patients" value={list.length} loading={!patients.data} />
-            <Kpi label="Critical" value={counts.Critical ?? 0} level="Critical" loading={!patients.data} />
-            <Kpi label="Warning" value={counts.Warning ?? 0} level="Warning" loading={!patients.data} />
-            <Kpi label="Open alerts" value={live.alerts.length} level={live.alerts.some((a) => a.status === "new") ? "Critical" : undefined} loading={!patients.data} />
+            <Kpi label="Patients" icon={Users} value={list.length} loading={!patients.data} />
+            <Kpi label="Critical" icon={Siren} value={counts.Critical ?? 0} level="Critical" loading={!patients.data} />
+            <Kpi label="Warning" icon={TriangleAlert} value={counts.Warning ?? 0} level="Warning" loading={!patients.data} />
+            <Kpi label="Open alerts" icon={BellRing} value={live.alerts.length} level={live.alerts.some((a) => a.status === "new") ? "Critical" : undefined} loading={!patients.data} />
           </div>
         </div>
 
@@ -125,13 +127,16 @@ export default function Doctor() {
               </button>
             ))}
           </div>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, bed or condition"
-            aria-label="Search patients"
-            className="h-10 w-full rounded-full border border-line bg-surface px-4 text-[14px] outline-none transition-colors placeholder:text-faint focus:border-line-2 sm:w-72"
-          />
+          <label className="relative block w-full sm:w-72">
+            <Search {...ic(15)} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search name, bed or condition"
+              aria-label="Search patients"
+              className="h-10 w-full rounded-full border border-line bg-surface pr-4 pl-10 text-[14px] outline-none transition-colors placeholder:text-faint focus:border-line-2"
+            />
+          </label>
         </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
@@ -168,10 +173,11 @@ export default function Doctor() {
   );
 }
 
-function Kpi({ label, value, level, loading }: { label: string; value: number; level?: Level; loading?: boolean }) {
+function Kpi({ label, value, level, loading, icon: Icon }: { label: string; value: number; level?: Level; loading?: boolean; icon: LucideIcon }) {
   return (
-    <div className="min-w-[120px] rounded-2xl border border-line bg-surface px-4 py-3">
-      <div className="eyebrow flex items-center gap-2">
+    <div className="group relative min-w-[132px] overflow-hidden rounded-2xl border border-line bg-surface px-4 py-3 transition-colors hover:border-line-2">
+      <Icon {...ic(40)} strokeWidth={1.25} className={cx("pointer-events-none absolute -right-2 -bottom-2 opacity-[0.07] transition-all duration-500 group-hover:scale-110 group-hover:opacity-[0.12]", level && value > 0 && LEVEL_STYLE[level].text)} />
+      <div className="eyebrow flex items-center gap-2 whitespace-nowrap">
         {level && <LevelDot level={level} className={value === 0 ? "opacity-30" : ""} />}
         {label}
       </div>
@@ -241,10 +247,14 @@ const PatientCard = forwardRef<HTMLDivElement, { p: PatientSummary; vitals?: Vit
           {SPARK.map(({ key, label }) => {
             const series = vitals?.map((v) => v[key] as number) ?? [];
             const n = p.normals[key];
+            const Icon = VITAL_ICON[key];
             return (
               <div key={key}>
                 <div className="flex items-baseline justify-between">
-                  <span className="font-mono text-[10px] tracking-[0.1em] text-muted">{label}</span>
+                  <span className="inline-flex items-center gap-1 font-mono text-[10px] tracking-[0.1em] text-muted">
+                    <Icon {...ic(12)} />
+                    {label}
+                  </span>
                   <span className="font-mono text-[13px] tnum">{fmtVital(key, p.latest[key] as number)}</span>
                 </div>
                 <div className="mt-1.5">

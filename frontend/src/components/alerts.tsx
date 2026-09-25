@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { BellRing, CircleCheck, Radio, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { DISCLAIMER, LEVEL_STYLE, fmtTime } from "../lib/format";
 import { onAlert, useLive } from "../lib/live";
 import type { AlertItem, Level } from "../lib/types";
-import { EmptyState, LevelDot, cx } from "./ui";
+import { LEVEL_ICON, ic } from "./icons";
+import { EmptyState, cx } from "./ui";
 
 /* ---------------- Sound (WebAudio, no asset files) ---------------- */
 
@@ -67,9 +69,10 @@ export function SoundToggle() {
           /* ignore */
         }
       }}
-      className="rounded-full border border-line px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted hover:text-ink"
+      className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted hover:text-ink"
       aria-pressed={on}
     >
+      {on ? <Volume2 {...ic(12)} /> : <VolumeX {...ic(12)} />}
       Sound {on ? "on" : "off"}
     </button>
   );
@@ -136,7 +139,7 @@ export function AlertToaster() {
               className={cx("pointer-events-auto rounded-2xl border bg-surface/95 p-4 text-left shadow-2xl backdrop-blur-xl", s.border)}
             >
               <div className="flex items-center gap-2">
-                <LevelDot level={alert.level} />
+                <LevelIcon level={alert.level} ring />
                 <span className={cx("font-mono text-[10px] uppercase tracking-[0.14em]", s.text)}>
                   {kind === "escalated" ? "Escalated" : "New alert"} · {alert.level}
                 </span>
@@ -191,7 +194,7 @@ export function AlertCard({ alert, compact = false }: { alert: AlertItem; compac
     >
       {isNew && <span className={cx("absolute inset-y-0 left-0 w-[3px]", s.dot)} />}
       <div className="flex items-center gap-2">
-        <LevelDot level={alert.level} />
+        <LevelIcon level={alert.level} ring={isNew} />
         <span className={cx("text-[12px] font-medium", s.text)}>{alert.level}</span>
         {alert.prev_level && alert.prev_level !== alert.level && (
           <span className="font-mono text-[10px] text-faint">from {alert.prev_level}</span>
@@ -282,7 +285,10 @@ export function AlertsPanel() {
   return (
     <div className="rounded-3xl border border-line bg-surface/60 p-5 backdrop-blur">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-[26px] leading-none">Alerts</h2>
+        <h2 className="flex items-center gap-2.5 font-display text-[26px] leading-none">
+          <BellRing {...ic(20)} className={fresh > 0 ? "bell-ring text-critical" : "text-muted"} />
+          Alerts
+        </h2>
         <div className="flex items-center gap-2">
           <span className="font-mono text-[12px] text-muted tnum">
             {fresh > 0 ? <span className="text-critical">{fresh} new</span> : `${alerts.length} open`}
@@ -293,9 +299,9 @@ export function AlertsPanel() {
       <p className="mt-2 text-[12px] leading-relaxed text-muted">Raised when a patient's level rises. New first.</p>
       <div className="mt-4 space-y-2">
         {live.status !== "live" && !live.sim ? (
-          <EmptyState title="Connecting…">Waiting for the live monitor.</EmptyState>
+          <EmptyState title="Connecting…" icon={Radio}>Waiting for the live monitor.</EmptyState>
         ) : alerts.length === 0 ? (
-          <EmptyState title="All quiet">No open alerts. Anyone whose level rises appears here first, with a sound.</EmptyState>
+          <EmptyState title="All quiet" icon={CircleCheck}>No open alerts. Anyone whose level rises appears here first, with a sound.</EmptyState>
         ) : (
           <AnimatePresence initial={false}>
             {alerts.map((a) => (
@@ -306,5 +312,17 @@ export function AlertsPanel() {
       </div>
       <p className="mt-4 text-[10px] leading-relaxed text-faint">{DISCLAIMER}</p>
     </div>
+  );
+}
+
+/** A risk level's icon in its colour; `ring` adds a soft pulse for alerts nobody has seen yet. */
+function LevelIcon({ level, ring }: { level: Level; ring?: boolean }) {
+  const Icon = LEVEL_ICON[level];
+  const s = LEVEL_STYLE[level];
+  return (
+    <span className={cx("relative grid size-6 shrink-0 place-items-center rounded-full", s.soft, s.text)}>
+      {ring && <span className={cx("absolute inset-0 rounded-full", level === "Critical" ? "pulse-critical" : "")} />}
+      <Icon {...ic(13)} />
+    </span>
   );
 }

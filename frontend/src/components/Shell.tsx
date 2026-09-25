@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { ChartLine, LayoutDashboard, Moon, Sun, UserRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { DISCLAIMER } from "../lib/format";
@@ -21,18 +22,23 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="h-8 rounded-full border border-line px-2.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted transition-colors hover:border-line-2 hover:text-ink sm:px-3 sm:text-[11px] sm:tracking-[0.12em]"
+      className="group inline-flex h-8 items-center gap-1.5 rounded-full border border-line px-2.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted transition-colors hover:border-line-2 hover:text-ink sm:px-3 sm:text-[11px] sm:tracking-[0.12em]"
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
     >
-      {theme === "dark" ? "Light" : "Dark"}
+      {theme === "dark" ? (
+        <Sun size={13} strokeWidth={1.75} aria-hidden className="transition-transform duration-500 group-hover:rotate-90" />
+      ) : (
+        <Moon size={13} strokeWidth={1.75} aria-hidden className="transition-transform duration-500 group-hover:-rotate-12" />
+      )}
+      <span className="hidden sm:inline">{theme === "dark" ? "Light" : "Dark"}</span>
     </button>
   );
 }
 
-const NAV: { to: string; label: string; short: string; tiny?: string }[] = [
-  { to: "/doctor", label: "Ward", short: "Ward" },
-  { to: "/evaluation", label: "Evaluation", short: "Proof" },
-  { to: "/patient", label: "Patient view", short: "Patient", tiny: "max-[359px]:hidden" }, // no room on 320 px phones
+const NAV: { to: string; label: string; short: string; icon: LucideIcon; tiny?: string }[] = [
+  { to: "/doctor", label: "Ward", short: "Ward", icon: LayoutDashboard },
+  { to: "/evaluation", label: "Evaluation", short: "Proof", icon: ChartLine },
+  { to: "/patient", label: "Patient view", short: "Patient", icon: UserRound, tiny: "max-[359px]:hidden" }, // no room on 320 px phones
 ];
 
 export function Shell({ children, status }: { children: ReactNode; status?: ReactNode }) {
@@ -60,8 +66,11 @@ export function Shell({ children, status }: { children: ReactNode; status?: Reac
                     {isActive && (
                       <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-surface-2" transition={{ type: "spring", stiffness: 400, damping: 34 }} />
                     )}
-                    <span className="relative sm:hidden">{n.short}</span>
-                    <span className="relative hidden sm:inline">{n.label}</span>
+                    <span className="relative inline-flex items-center gap-1.5">
+                      <n.icon size={14} strokeWidth={1.75} aria-hidden className="hidden sm:block" />
+                      <span className="sm:hidden">{n.short}</span>
+                      <span className="hidden sm:inline">{n.label}</span>
+                    </span>
                   </>
                 )}
               </NavLink>
