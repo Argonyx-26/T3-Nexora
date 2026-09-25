@@ -4,6 +4,7 @@ import { HandHeart, LayoutDashboard, ShieldPlus, Stethoscope, Target, TrendingUp
 import { Link } from "react-router-dom";
 import { HeroMonitor } from "../components/HeroMonitor";
 import { HospitalStory } from "../components/HospitalStory";
+import { Buddy } from "../components/Buddy";
 import { ArtBaseline, ArtBreath, ArtNews2, ArtTrend, ArtWard, CountUp, LiveTicker, Pulse, spotlight } from "../components/motion";
 import { ThemeToggle, Wordmark } from "../components/Shell";
 import { api, useQuery } from "../lib/api";
@@ -51,6 +52,7 @@ export default function Landing() {
   return (
     <div className="min-h-dvh overflow-x-clip bg-bg">
       <TopBar />
+      <Buddy />
       <Hero />
       <LiveTicker />
       <HospitalStory />
@@ -93,7 +95,7 @@ function Hero() {
   const fieldScale = useTransform(scrollYProgress, [0, 1], [1, 1.12]);
 
   return (
-    <section ref={ref} className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
+    <section ref={ref} data-guide="hero" className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
       <div className="bg-grid absolute inset-x-0 top-0 -z-20 h-[42%] opacity-50 [mask-image:radial-gradient(ellipse_at_25%_0%,black,transparent_70%)]" />
       <motion.div
         aria-hidden
@@ -209,7 +211,7 @@ function ScrollStory() {
 
   if (!desktop) {
     return (
-      <section className="border-b border-line py-20">
+      <section data-guide="story" className="border-b border-line py-20">
         <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
           <div className="eyebrow">Watch AYU catch it</div>
           <h2 className="mt-4 font-display text-[44px] leading-[0.95]">A quiet <span className="accent text-teal">slide.</span></h2>
@@ -229,7 +231,7 @@ function ScrollStory() {
   }
 
   return (
-    <section ref={ref} className="relative h-[460vh] border-b border-line">
+    <section ref={ref} data-guide="story" className="relative h-[460vh] border-b border-line">
       <div className="sticky top-0 flex h-[100svh] items-center overflow-hidden">
         <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_75%_50%,var(--teal-soft),transparent_60%)]" />
         <div className="mx-auto grid w-full max-w-[1400px] items-center gap-16 px-8 lg:grid-cols-[1fr_1.05fr]">
@@ -291,7 +293,7 @@ function Stats() {
         { node: <CountUp value={10} />, label: "patients on a live, simulated ward" },
       ];
   return (
-    <section className="border-b border-line">
+    <section data-guide="stats" className="border-b border-line">
       <div className="mx-auto grid max-w-[1400px] grid-cols-2 lg:grid-cols-4">
         {items.map((it, i) => (
           <Reveal
@@ -324,7 +326,7 @@ function Lenses() {
     { n: "03", icon: TrendingUp, title: "Which way they're heading", art: <ArtTrend />, body: "A three-hour slope on every vital, counted only when it is steep and sustained. A fall that stays inside 'normal' is still a fall.", ex: [["SpO₂", "−0.9%/hr"], ["Window", "3 h"], ["Significance", "≥ 3 SE"], ["False flags at rest", "≈ 0.1%"]] },
   ];
   return (
-    <section className="border-b border-line py-28 sm:py-36">
+    <section data-guide="lenses" className="border-b border-line py-28 sm:py-36">
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <Reveal>
           <div className="eyebrow">How AYU reads a patient</div>
@@ -377,7 +379,7 @@ function Explain() {
   const total = Math.round(DEMO_FACTORS.reduce((s, f) => s + f.pts, 0));
   const offsets = DEMO_FACTORS.map((_, i) => DEMO_FACTORS.slice(0, i).reduce((s, f) => s + f.pts, 0));
   return (
-    <section className="border-b border-line py-28 sm:py-36">
+    <section data-guide="explain" className="border-b border-line py-28 sm:py-36">
       <div className="mx-auto grid max-w-[1400px] items-center gap-16 px-4 sm:px-8 lg:grid-cols-[1fr_1.1fr]">
         <Reveal>
           <div className="eyebrow">Explainable by construction</div>
@@ -436,7 +438,7 @@ function Explain() {
 
 function Roles() {
   return (
-    <section className="py-28 sm:py-36">
+    <section data-guide="roles" className="py-28 sm:py-36">
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <Reveal>
           <h2 className="font-display text-[clamp(42px,6vw,96px)] leading-[0.92]">
@@ -480,7 +482,7 @@ function RoleCard({ to, who, line, meta, art, icon: Icon }: { to: string; who: s
 
 function BigFooter() {
   return (
-    <footer className="relative overflow-hidden border-t border-line">
+    <footer data-guide="footer" className="relative overflow-hidden border-t border-line">
       <div className="mx-auto max-w-[1400px] px-4 pt-20 sm:px-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <p className="max-w-md text-[15px] leading-relaxed">
