@@ -84,7 +84,7 @@ export function LiveStatus() {
   return (
     <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted" role="status" aria-live="polite">
       <span className={cx("size-1.5 rounded-full", tone === "live" ? "live-dot bg-stable" : tone === "paused" ? "bg-muted" : "bg-watch")} />
-      <span className={tone === "live" ? "text-ink-2" : ""}>
+      <span className={cx("hidden sm:inline", tone === "live" && "text-ink-2")}>
         {tone === "live" ? "Live" : tone === "paused" ? "Paused" : tone === "connecting" ? "Connecting" : "Reconnecting"}
       </span>
       {time && <span className="hidden text-muted sm:inline">· {time} IST</span>}

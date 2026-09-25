@@ -21,7 +21,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="h-8 rounded-full border border-line px-3 font-mono text-[11px] uppercase tracking-[0.12em] text-muted transition-colors hover:border-line-2 hover:text-ink"
+      className="h-8 rounded-full border border-line px-2.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted transition-colors hover:border-line-2 hover:text-ink sm:px-3 sm:text-[11px] sm:tracking-[0.12em]"
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
     >
       {theme === "dark" ? "Light" : "Dark"}
@@ -29,9 +29,10 @@ export function ThemeToggle() {
   );
 }
 
-const NAV = [
-  { to: "/doctor", label: "Ward" },
-  { to: "/patient", label: "Patient view" },
+const NAV: { to: string; label: string; short: string; tiny?: string }[] = [
+  { to: "/doctor", label: "Ward", short: "Ward" },
+  { to: "/evaluation", label: "Evaluation", short: "Proof" },
+  { to: "/patient", label: "Patient view", short: "Patient", tiny: "max-[359px]:hidden" }, // no room on 320 px phones
 ];
 
 export function Shell({ children, status }: { children: ReactNode; status?: ReactNode }) {
@@ -43,7 +44,7 @@ export function Shell({ children, status }: { children: ReactNode; status?: Reac
         <div className="absolute -top-64 left-[15%] h-[560px] w-[900px] rounded-full bg-[radial-gradient(closest-side,var(--glow),transparent)] opacity-40 blur-3xl" />
       </div>
       <header className="sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-3 px-4 sm:gap-6 sm:px-8">
+        <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-2 px-4 sm:gap-6 sm:px-8">
           <Wordmark />
           <nav className="flex min-w-0 items-center gap-0.5 sm:gap-1">
             {NAV.map((n) => (
@@ -51,7 +52,7 @@ export function Shell({ children, status }: { children: ReactNode; status?: Reac
                 key={n.to}
                 to={n.to}
                 className={({ isActive }) =>
-                  cx("relative whitespace-nowrap rounded-full px-2.5 py-1.5 text-[13px] transition-colors sm:px-3 sm:text-[14px]", isActive ? "text-ink" : "text-muted hover:text-ink")
+                  cx("relative whitespace-nowrap rounded-full px-2 py-1.5 text-[13px] transition-colors sm:px-3 sm:text-[14px]", n.tiny, isActive ? "text-ink" : "text-muted hover:text-ink")
                 }
               >
                 {({ isActive }) => (
@@ -59,13 +60,14 @@ export function Shell({ children, status }: { children: ReactNode; status?: Reac
                     {isActive && (
                       <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-surface-2" transition={{ type: "spring", stiffness: 400, damping: 34 }} />
                     )}
-                    <span className="relative">{n.label}</span>
+                    <span className="relative sm:hidden">{n.short}</span>
+                    <span className="relative hidden sm:inline">{n.label}</span>
                   </>
                 )}
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             {status}
             <ThemeToggle />
           </div>
