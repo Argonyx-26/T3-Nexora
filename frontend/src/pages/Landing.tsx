@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { HeroMonitor } from "../components/HeroMonitor";
 import { ArtBaseline, ArtBreath, ArtNews2, ArtTrend, ArtWard, CountUp, LiveTicker, Pulse, spotlight } from "../components/motion";
 import { ThemeToggle, Wordmark } from "../components/Shell";
+import { api, useQuery } from "../lib/api";
 import { VitalField } from "../components/VitalField";
 import { Arrow, Button, Reveal, cx } from "../components/ui";
 import { DISCLAIMER, LEVEL_STYLE } from "../lib/format";
@@ -267,12 +268,23 @@ function ScrollStory() {
 /* ---------------- Numbers ---------------- */
 
 function Stats() {
-  const items: { node: ReactNode; label: string }[] = [
-    { node: <CountUp value={75} suffix=" min" />, label: "earlier than NEWS2 to Watch, in one simulated SpO₂ drift" },
-    { node: <CountUp value={0.1} decimals={1} prefix="≈" suffix="%" />, label: "false trend flags on resting patients" },
-    { node: <CountUp value={3} suffix=" h" />, label: "trend window, corrected for autocorrelation" },
-    { node: <CountUp value={129} />, label: "automated tests on the risk engine" },
-  ];
+  // Live numbers from the evaluation; if the API isn't reachable (e.g. a static preview), show the single-run figures.
+  const ev = useQuery((s) => api.leadTime(s), []);
+  const u = ev.data?.summary.urgent;
+  const f = ev.data?.summary.first;
+  const items: { node: ReactNode; label: string }[] = u && f && ev.data
+    ? [
+        { node: <CountUp value={Math.round((u.lead_h_median ?? 0) * 60)} suffix=" min" />, label: `median head start over NEWS2 to urgent review, across ${ev.data.summary.runs} simulated deteriorations` },
+        { node: <><CountUp value={u.ayu_first} /><span className="text-[0.45em] text-muted"> / {ev.data.summary.runs}</span></>, label: `runs where AYU escalated first — NEWS2 was first in ${u.news2_first}` },
+        { node: <CountUp value={u.news2_never} />, label: `deteriorations NEWS2 never escalated on within ${ev.data.config.horizon_h} hours; ${u.ayu_never === 0 ? "AYU caught every one" : `AYU missed ${u.ayu_never}`}` },
+        { node: <CountUp value={f.rest_ayu_alarms} />, label: `false first alerts at rest, against ${f.rest_news2_alarms} for NEWS2, over ${ev.data.summary.rest_patient_days} patient-days` },
+      ]
+    : [
+        { node: <CountUp value={75} suffix=" min" />, label: "earlier than NEWS2 to Watch, in one simulated SpO₂ drift" },
+        { node: <CountUp value={0.1} decimals={1} prefix="≈" suffix="%" />, label: "false trend flags on resting patients" },
+        { node: <CountUp value={3} suffix=" h" />, label: "trend window, corrected for autocorrelation" },
+        { node: <CountUp value={10} />, label: "patients on a live, simulated ward" },
+      ];
   return (
     <section className="border-b border-line">
       <div className="mx-auto grid max-w-[1400px] grid-cols-2 lg:grid-cols-4">
@@ -283,10 +295,17 @@ function Stats() {
             className={cx("border-line px-4 py-14 sm:px-8", i % 2 === 0 && "border-r", i < 2 && "border-b lg:border-b-0", i === 1 && "lg:border-r")}
           >
             <div className="font-display text-[clamp(40px,5vw,76px)] leading-none tnum">{it.node}</div>
-            <p className="mt-4 max-w-[240px] text-[14px] leading-relaxed text-muted">{it.label}</p>
+            <p className="mt-4 max-w-[260px] text-[14px] leading-relaxed text-muted">{it.label}</p>
           </Reveal>
         ))}
       </div>
+      {ev.data && (
+        <div className="mx-auto max-w-[1400px] border-t border-line px-4 py-5 sm:px-8">
+          <Link to="/evaluation" className="group inline-flex items-center gap-2 text-[14px] text-ink-2 hover:text-ink">
+            See the full evaluation — method, every scenario, and its limits <Arrow />
+          </Link>
+        </div>
+      )}
     </section>
   );
 }
