@@ -1,0 +1,10 @@
+# Pinned for a stable demo. Python 3.11.
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+sqlmodel==0.0.47
+sqlalchemy==2.0.54
+pydantic==2.13.5
+python-dotenv==1.2.3
+google-genai==2.25.0
+httpx==0.28.1
+pytest==9.1.1
