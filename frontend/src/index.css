@@ -9,9 +9,9 @@
 
 /* The whole palette. Light first; .dark swaps the same names. */
 :root {
-  --bg: #fbfbf9;
+  --bg: #f6f7fb;
   --surface: #ffffff;
-  --surface-2: #f3f3ef;
+  --surface-2: #eef0f6;
   --ink: #0d1117;
   --ink-2: #394150;
   --muted: #687182;
@@ -35,6 +35,17 @@
   --chart-grid: #ebebe6;
   --band: rgba(15, 118, 110, 0.09);
   --glow: rgba(15, 118, 110, 0.25);
+
+  /* Decorative accents — never used for risk, which keeps amber/orange/red to itself. */
+  --violet: #7c3aed;
+  --violet-soft: #efe9fe;
+  --sky: #0284c7;
+  --sky-soft: #e3f2fc;
+  --pink: #db2777;
+  --pink-soft: #fce7f3;
+  --aurora-1: rgba(20, 184, 166, 0.16);
+  --aurora-2: rgba(124, 58, 237, 0.12);
+  --aurora-3: rgba(2, 132, 199, 0.12);
 }
 
 .dark {
@@ -64,6 +75,16 @@
   --chart-grid: #161d26;
   --band: rgba(45, 212, 191, 0.09);
   --glow: rgba(45, 212, 191, 0.35);
+
+  --violet: #a78bfa;
+  --violet-soft: rgba(167, 139, 250, 0.12);
+  --sky: #38bdf8;
+  --sky-soft: rgba(56, 189, 248, 0.11);
+  --pink: #f472b6;
+  --pink-soft: rgba(244, 114, 182, 0.11);
+  --aurora-1: rgba(45, 212, 191, 0.09);
+  --aurora-2: rgba(139, 92, 246, 0.1);
+  --aurora-3: rgba(14, 165, 233, 0.08);
 }
 
 @theme inline {
@@ -87,6 +108,12 @@
   --color-warning-soft: var(--warning-soft);
   --color-critical: var(--critical);
   --color-critical-soft: var(--critical-soft);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
+  --color-pink: var(--pink);
+  --color-pink-soft: var(--pink-soft);
 
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", monospace;
@@ -205,6 +232,25 @@ body {
 }
 .live-dot {
   animation: ayu-blink 1.6s ease-in-out infinite;
+}
+/* Soft colour fields behind whole pages: teal, violet and sky light, fixed as you scroll. */
+.aurora {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(900px 600px at 8% 12%, var(--aurora-1), transparent 60%),
+    radial-gradient(800px 560px at 92% 30%, var(--aurora-2), transparent 60%),
+    radial-gradient(900px 620px at 40% 95%, var(--aurora-3), transparent 60%);
+  background-attachment: fixed;
+}
+/* A colourful gradient for the moments worth shouting about. */
+.bg-spectrum {
+  background: linear-gradient(115deg, #0d9488 0%, #0284c7 45%, #7c3aed 100%);
+}
+.text-spectrum {
+  background: linear-gradient(100deg, var(--teal) 0%, var(--sky) 50%, var(--violet) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 /* The hero monitor's HTML readout; VitalField sets --vf to the trace colour and data-beat on each R peak. */
 .vf-readout {
