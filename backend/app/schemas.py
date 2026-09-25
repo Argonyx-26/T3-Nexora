@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated
 
-from pydantic import BaseModel, PlainSerializer
+from pydantic import BaseModel, Field, PlainSerializer
 
 
 def _iso_utc(d: datetime) -> str:
@@ -241,3 +241,33 @@ class SymptomLogOut(BaseModel):
     source: str
     note: str
     resolved_at: UTC | None
+
+
+# --- Phase 4: explanations, manual readings ------------------------------------------
+
+
+class ExplanationOut(BaseModel):
+    patient_id: str
+    lang: str
+    level: str
+    score: int
+    doctor: str  # 2-3 sentences for the clinician
+    patient: str  # one plain sentence for the patient
+    urgency: str
+    source: str  # "gemini" | "template"
+    model: str | None
+    generated_at: UTC
+    disclaimer: str
+
+
+class VitalsIn(BaseModel):
+    """A reading typed in by the patient, an ASHA worker or staff. Leave out what wasn't measured."""
+
+    hr: float | None = Field(None, ge=20, le=250)
+    spo2: float | None = Field(None, ge=50, le=100)
+    sbp: float | None = Field(None, ge=50, le=260)
+    dbp: float | None = Field(None, ge=30, le=160)
+    rr: float | None = Field(None, ge=4, le=60)
+    temp: float | None = Field(None, ge=32, le=43)
+    glucose: float | None = Field(None, ge=20, le=600)
+    source: str = "patient"  # "patient" | "asha" | "staff"

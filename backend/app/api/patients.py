@@ -4,6 +4,8 @@ from datetime import timedelta
 
 import asyncio
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
@@ -12,8 +14,10 @@ from ..models import DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport
 from ..risk import weights as W
 from ..risk.adherence import effective_status
 from ..risk.types import Dose
+from ..explain.service import explainer
 from ..schemas import (
     DoseOut,
+    ExplanationOut,
     MedicationOut,
     PatientSummary,
     RiskOut,
@@ -21,6 +25,7 @@ from ..schemas import (
     SymptomLogOut,
     SymptomsIn,
     VitalOut,
+    VitalsIn,
 )
 from ..services.hub import hub
 from ..services.serialize import risk_brief, risk_out
@@ -172,5 +177,29 @@ async def report_symptoms(patient_id: str, body: SymptomsIn):
     if body.source not in ("patient", "asha", "staff"):
         raise HTTPException(422, "source must be patient, asha or staff")
     message = await asyncio.to_thread(sim.report_symptoms, patient_id, list(dict.fromkeys(body.symptoms)), body.source, body.note[:500])
+    await hub.broadcast(message)
+    return risk_out(patient_id, sim.get(patient_id).risk)
+
+
+@router.get("/{patient_id}/explanation", response_model=ExplanationOut,
+            summary="Plain-language explanation for the doctor and the patient (Gemini, or built-in templates)")
+async def explanation(patient_id: str, lang: Literal["en", "hi"] = "en"):
+    ps = sim.get(patient_id)
+    if ps is None:
+        raise HTTPException(404, f"No patient {patient_id}")
+    out = await explainer.explain(patient_id, ps.risk, lang, sim.now)
+    return ExplanationOut(patient_id=patient_id, **out, disclaimer=W.DISCLAIMER)
+
+
+@router.post("/{patient_id}/vitals", response_model=RiskOut, summary="Log a reading by hand; the patient is re-scored at once")
+async def log_vitals(patient_id: str, body: VitalsIn):
+    if sim.get(patient_id) is None:
+        raise HTTPException(404, f"No patient {patient_id}")
+    if body.source not in ("patient", "asha", "staff"):
+        raise HTTPException(422, "source must be patient, asha or staff")
+    values = body.model_dump(exclude_none=True, exclude={"source"})
+    if not values:
+        raise HTTPException(422, "Enter at least one reading")
+    message = await asyncio.to_thread(sim.add_manual_reading, patient_id, values, body.source)
     await hub.broadcast(message)
     return risk_out(patient_id, sim.get(patient_id).risk)

@@ -94,6 +94,7 @@ class PState:
     held: str = "Stable"
     below: int = 0
     pending_watch: bool = False  # a rise to Watch waiting for the next tick to confirm it
+    sources: dict = field(default_factory=dict)  # reading ts → "manual" / "asha" / "staff" for typed-in readings
     open_alert_id: int | None = None
     last_alert_at: datetime | None = None
     last_alert_level: str = "Stable"
@@ -353,7 +354,7 @@ class Simulator:
         last = ps.history[-1]
         vitals = VitalOut(ts=last.ts, hr=last.hr, spo2=last.spo2, sbp=last.sbp, dbp=last.dbp, rr=last.rr, temp=last.temp,
                           glucose=last.glucose, on_oxygen=last.on_oxygen, consciousness=last.consciousness,
-                          source="sim")
+                          source=ps.sources.get(last.ts, "sim"))
         brief = risk_brief(r)
         return LiveUpdate(
             patient_id=ps.id, vitals=vitals,
@@ -422,6 +423,22 @@ class Simulator:
             ps = self.states[patient_id]
             with Session(engine) as s:
                 self._add_symptoms(ps, s, keys, source=source, note=note)
+                s.commit()
+            return self.reassess(patient_id)
+
+    def add_manual_reading(self, patient_id: str, values: dict[str, float], source: str) -> dict:
+        """A reading typed in by hand. Unmeasured vitals carry forward from the latest reading;
+        it is stamped a minute after the latest one so the stream stays in order."""
+        with self.lock:
+            ps = self.states[patient_id]
+            last = ps.history[-1]
+            ts = last.ts + timedelta(minutes=1)
+            merged = {v: values.get(v, getattr(last, v)) for v in ("hr", "spo2", "sbp", "dbp", "rr", "temp", "glucose")}
+            ps.history.append(Reading(ts=ts, on_oxygen=ps.on_oxygen, consciousness=ps.consciousness, **merged))
+            ps.sources[ts] = source
+            with Session(engine) as s:
+                s.execute(insert(VitalReading), [{"patient_id": ps.id, "ts": ts, "on_oxygen": ps.on_oxygen,
+                                                  "consciousness": ps.consciousness, "source": source, **merged}])
                 s.commit()
             return self.reassess(patient_id)
 
