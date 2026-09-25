@@ -157,3 +157,87 @@ class RiskPointOut(BaseModel):
     score: int
     level: str
     news2: int
+
+
+# --- Phase 2: live simulator, alerts ------------------------------------------------
+
+
+class AlertOut(BaseModel):
+    id: int
+    patient_id: str
+    patient_name: str
+    bed: str
+    created_at: UTC
+    updated_at: UTC | None
+    level: str
+    prev_level: str
+    score: int
+    title: str
+    summary: str
+    factors: list[FactorOut]
+    status: str
+    acknowledged_at: UTC | None
+    resolved_at: UTC | None
+    note: str
+    acknowledged_by: str
+    disclaimer: str
+
+
+class LiveRisk(RiskBrief):
+    alert_level: str  # the level alerts are held at (rises at once, drops only after it stays lower)
+    qsofa_flag: bool
+    top_factors: list[str]
+
+
+class LiveUpdate(BaseModel):
+    patient_id: str
+    vitals: VitalOut
+    risk: LiveRisk
+    scenario: str | None
+
+
+class SimState(BaseModel):
+    sim_time: UTC
+    speed: int
+    paused: bool
+    running: bool
+    tick_seconds: float
+    minutes_per_tick: int
+    scenarios: dict[str, str]  # patient_id → active scenario
+
+
+class ScenarioIn(BaseModel):
+    patient_id: str
+    scenario: str
+
+
+class SpeedIn(BaseModel):
+    speed: int
+
+
+class NoteIn(BaseModel):
+    note: str = ""
+    by: str = "Doctor"
+
+
+class SymptomsIn(BaseModel):
+    symptoms: list[str]
+    note: str = ""
+    source: str = "patient"  # "patient" | "asha" | "staff"
+
+
+class DoseIn(BaseModel):
+    dose_id: int
+    status: str  # "taken" | "missed"
+
+
+class SymptomLogOut(BaseModel):
+    id: int
+    ts: UTC
+    symptom: str
+    label_en: str
+    label_hi: str
+    red_flag: bool
+    source: str
+    note: str
+    resolved_at: UTC | None
