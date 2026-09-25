@@ -8,6 +8,7 @@ import Landing from "./pages/Landing";
 const Doctor = lazy(() => import("./pages/Doctor"));
 const PatientDetail = lazy(() => import("./pages/PatientDetail"));
 const Demo = lazy(() => import("./pages/Demo"));
+const Evaluation = lazy(() => import("./pages/Evaluation"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PatientPicker = lazy(() => import("./pages/PatientPortal").then((m) => ({ default: m.PatientPicker })));
 const PatientHome = lazy(() => import("./pages/PatientPortal").then((m) => ({ default: m.PatientHome })));
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/doctor" element={<Doctor />} />
             <Route path="/demo" element={<Demo />} />
+            <Route path="/evaluation" element={<Evaluation />} />
             <Route path="/patients/:id" element={<PatientDetail />} />
             <Route path="/patient" element={<PatientPicker />} />
             <Route path="/patient/:id" element={<PatientHome />} />

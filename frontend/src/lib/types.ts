@@ -192,3 +192,35 @@ export interface Explanation {
 
 export type ReadingSource = "patient" | "asha" | "staff";
 export type VitalsInput = Partial<Record<"hr" | "spo2" | "sbp" | "dbp" | "rr" | "temp" | "glucose", number>>;
+
+// --- Evaluation (/eval/lead-time) ---------------------------------------------------
+
+export type Tier = "urgent" | "first";
+
+export interface TierSummary {
+  ayu_h_median: number | null;
+  news2_h_median: number | null;
+  lead_h_median: number | null;
+  lead_h_min: number | null;
+  lead_h_max: number | null;
+  ayu_first: number;
+  ties: number;
+  news2_first: number;
+  ayu_never: number;
+  news2_never: number;
+}
+
+export interface EvalResult {
+  config: {
+    seeds: number;
+    horizon_h: number;
+    minutes_per_tick: number;
+    rest_hours_per_seed: number;
+    tiers: Record<Tier, { label: string; news2: string; ayu: string }>;
+  };
+  summary: { runs: number; rest_patient_days: number } & Record<Tier, TierSummary & { rest_ayu_alarms: number; rest_news2_alarms: number }>;
+  scenarios: ({ key: string; label: string; patients: string[]; runs: number } & Record<Tier, TierSummary>)[];
+  runs: ({ scenario: string; patient_id: string; patient_name: string; seed: number } & Record<Tier, { ayu_h: number | null; news2_h: number | null; lead_h: number | null }>)[];
+  rest: ({ patient_id: string; patient_name: string; patient_days: number } & Record<Tier, { ayu: number; news2: number }>)[];
+  example: { scenario: string; patient_id: string; patient_name: string; points: { h: number; ayu: number; news2: number }[] };
+}
