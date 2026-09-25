@@ -4,7 +4,6 @@ import { Link, useParams } from "react-router-dom";
 import { Shell } from "../components/Shell";
 import { Check, ClipboardList, Clock, HandHeart, Languages, NotebookPen, Pill, Send, TriangleAlert, UserRound } from "lucide-react";
 import { LEVEL_ICON, VITAL_ICON, ic } from "../components/icons";
-import { PatientArt } from "../components/Illustrations";
 import { Card, EmptyState, ErrorState, Eyebrow, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
 import { DISCLAIMER, LEVEL_STYLE, RED_FLAG_SYMPTOMS, SYMPTOM_LABEL, fmtTime, fmtVital, initials, istDateKey } from "../lib/format";
@@ -71,22 +70,14 @@ const FIELDS: { key: FieldKey; label: (t: (typeof T)["en"]) => string; unit: str
 
 const SYMPTOM_ORDER = Object.keys(SYMPTOM_LABEL).sort((a, b) => Number(RED_FLAG_SYMPTOMS.has(b)) - Number(RED_FLAG_SYMPTOMS.has(a)));
 
-// Friendly, varied avatar colours for the name list (decorative accents only, never risk colours).
-const AVATAR = ["bg-teal-soft text-teal", "bg-violet-soft text-violet", "bg-sky-soft text-sky", "bg-pink-soft text-pink"];
-
 export function PatientPicker() {
   const patients = useQuery((s) => api.patients(s), []);
   return (
     <Shell>
       <div className="mx-auto max-w-3xl px-4 pt-14 pb-24 sm:px-8">
-        <div className="flex flex-col-reverse gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <Eyebrow icon={UserRound}>Patient view · demo sign-in</Eyebrow>
-            <h1 className="mt-3 font-display text-[clamp(44px,6vw,80px)] leading-none tracking-[-0.02em]">Who are you?</h1>
-            <p className="mt-3 text-[15px] text-muted">Pick your name to see your status. <span className="text-ink-2">अपना नाम चुनें।</span></p>
-          </div>
-          <PatientArt className="w-48 shrink-0 self-center sm:w-56 sm:self-auto" />
-        </div>
+        <Eyebrow icon={UserRound}>Patient view · demo sign-in</Eyebrow>
+        <h1 className="mt-3 font-display text-[clamp(44px,6vw,80px)] leading-none tracking-[-0.02em]">Who are you?</h1>
+        <p className="mt-3 text-[15px] text-muted">Pick your name to see your status. <span className="text-ink-2">अपना नाम चुनें।</span></p>
         <div className="mt-10 divide-y divide-line border-y border-line">
           {patients.error && !patients.data ? (
             <div className="py-6"><ErrorState error={patients.error} onRetry={patients.reload} /></div>
@@ -96,7 +87,7 @@ export function PatientPicker() {
             [...patients.data].sort((a, b) => a.name.localeCompare(b.name)).map((p, i) => (
               <motion.div key={p.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                 <Link to={`/patient/${p.id}`} className="group flex items-center gap-4 py-4">
-                  <span className={cx("grid size-10 place-items-center rounded-full font-mono text-[12px] transition-transform duration-300 group-hover:scale-110", AVATAR[i % AVATAR.length])}>{initials(p.name)}</span>
+                  <span className="grid size-10 place-items-center rounded-full bg-surface-2 font-mono text-[12px] text-ink-2 transition-colors group-hover:bg-teal-soft group-hover:text-teal">{initials(p.name)}</span>
                   <span className="flex-1 text-[17px] transition-transform duration-300 group-hover:translate-x-1">{p.name}</span>
                   <span className="font-mono text-[12px] text-muted">{p.bed}</span>
                   <span className="text-muted transition-all duration-300 group-hover:translate-x-1 group-hover:text-teal">→</span>

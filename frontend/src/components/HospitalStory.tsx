@@ -75,7 +75,7 @@ export function HospitalStory() {
   const s = STEPS[step];
 
   return (
-    <section ref={ref} data-guide="hospital" className="relative h-[420vh] border-b border-line" aria-label="How AYU works on a ward">
+    <section ref={ref} className="relative h-[420vh] border-b border-line" aria-label="How AYU works on a ward">
       <div className="sticky top-0 flex h-[100svh] flex-col justify-center overflow-hidden">
         <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_62%_58%,var(--teal-soft),transparent_58%)]" />
         <div className="mx-auto grid w-full max-w-[1400px] items-center gap-6 px-4 sm:px-8 lg:grid-cols-[0.85fr_1.15fr] lg:gap-12">

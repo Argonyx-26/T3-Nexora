@@ -44,7 +44,7 @@ const NAV: { to: string; label: string; short: string; icon: LucideIcon; tiny?: 
 export function Shell({ children, status }: { children: ReactNode; status?: ReactNode }) {
   const { pathname } = useLocation();
   return (
-    <div className="aurora relative isolate flex min-h-dvh flex-col">
+    <div className="relative isolate flex min-h-dvh flex-col">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] overflow-hidden">
         <div className="bg-grid absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_20%_0%,black,transparent_70%)]" />
         <div className="absolute -top-64 left-[15%] h-[560px] w-[900px] rounded-full bg-[radial-gradient(closest-side,var(--glow),transparent)] opacity-40 blur-3xl" />

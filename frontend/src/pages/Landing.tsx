@@ -4,9 +4,7 @@ import { HandHeart, LayoutDashboard, ShieldPlus, Stethoscope, Target, TrendingUp
 import { Link } from "react-router-dom";
 import { HeroMonitor } from "../components/HeroMonitor";
 import { HospitalStory } from "../components/HospitalStory";
-import { Buddy } from "../components/Buddy";
-import { ArtBaseline, ArtNews2, ArtTrend, CountUp, LiveTicker, Pulse, spotlight } from "../components/motion";
-import { DoctorArt, PatientArt } from "../components/Illustrations";
+import { ArtBaseline, ArtBreath, ArtNews2, ArtTrend, ArtWard, CountUp, LiveTicker, Pulse, spotlight } from "../components/motion";
 import { ThemeToggle, Wordmark } from "../components/Shell";
 import { api, useQuery } from "../lib/api";
 import { VitalField } from "../components/VitalField";
@@ -51,9 +49,8 @@ function Words({ text, delay = 0, className }: { text: string; delay?: number; c
 
 export default function Landing() {
   return (
-    <div className="aurora min-h-dvh overflow-x-clip">
+    <div className="min-h-dvh overflow-x-clip bg-bg">
       <TopBar />
-      <Buddy />
       <Hero />
       <LiveTicker />
       <HospitalStory />
@@ -96,19 +93,12 @@ function Hero() {
   const fieldScale = useTransform(scrollYProgress, [0, 1], [1, 1.12]);
 
   return (
-    <section ref={ref} data-guide="hero" className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
+    <section ref={ref} className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
       <div className="bg-grid absolute inset-x-0 top-0 -z-20 h-[42%] opacity-50 [mask-image:radial-gradient(ellipse_at_25%_0%,black,transparent_70%)]" />
       <motion.div
         aria-hidden
         style={{ opacity: fade }}
         className="absolute -top-80 left-[10%] -z-20 h-[620px] w-[1100px] rounded-full bg-[radial-gradient(closest-side,var(--glow),transparent)] opacity-50 blur-3xl"
-      />
-      <motion.div
-        aria-hidden
-        style={{ opacity: fade }}
-        animate={{ x: [0, 40, 0], y: [0, 24, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute top-24 -right-40 -z-20 h-[560px] w-[760px] rounded-full bg-[radial-gradient(closest-side,var(--aurora-2),transparent)] blur-3xl"
       />
       <motion.div
         initial={{ opacity: 0 }}
@@ -118,6 +108,9 @@ function Hero() {
         className="absolute inset-x-0 bottom-0 -z-10 h-[62%] origin-bottom"
       >
         <VitalField className="h-full w-full" />
+        {/* Fades drawn as overlays, not CSS masks: Chromium drops a masked canvas entirely. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,var(--bg)_0%,transparent_34%)]" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--bg)_0%,color-mix(in_srgb,var(--bg)_70%,transparent)_30%,transparent_62%)]" />
       </motion.div>
 
       <motion.div style={{ y: headY, opacity: fade }} className="relative mx-auto w-full max-w-[1400px] px-4 pt-32 sm:px-8 sm:pt-40">
@@ -216,7 +209,7 @@ function ScrollStory() {
 
   if (!desktop) {
     return (
-      <section data-guide="story" className="border-b border-line py-20">
+      <section className="border-b border-line py-20">
         <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
           <div className="eyebrow">Watch AYU catch it</div>
           <h2 className="mt-4 font-display text-[44px] leading-[0.95]">A quiet <span className="accent text-teal">slide.</span></h2>
@@ -236,7 +229,7 @@ function ScrollStory() {
   }
 
   return (
-    <section ref={ref} data-guide="story" className="relative h-[460vh] border-b border-line">
+    <section ref={ref} className="relative h-[460vh] border-b border-line">
       <div className="sticky top-0 flex h-[100svh] items-center overflow-hidden">
         <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_75%_50%,var(--teal-soft),transparent_60%)]" />
         <div className="mx-auto grid w-full max-w-[1400px] items-center gap-16 px-8 lg:grid-cols-[1fr_1.05fr]">
@@ -298,24 +291,22 @@ function Stats() {
         { node: <CountUp value={10} />, label: "patients on a live, simulated ward" },
       ];
   return (
-    <section data-guide="stats" className="bg-spectrum relative overflow-hidden text-white">
-      <div aria-hidden className="bg-grid pointer-events-none absolute inset-0 opacity-20 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
-      <div aria-hidden className="pointer-events-none absolute -top-40 right-[10%] size-[520px] rounded-full bg-white/10 blur-3xl" />
-      <div className="relative mx-auto grid max-w-[1400px] grid-cols-2 lg:grid-cols-4">
+    <section className="border-b border-line">
+      <div className="mx-auto grid max-w-[1400px] grid-cols-2 lg:grid-cols-4">
         {items.map((it, i) => (
           <Reveal
             key={i}
             delay={i * 0.08}
-            className={cx("border-white/15 px-4 py-14 sm:px-8", i % 2 === 0 && "border-r", i < 2 && "border-b lg:border-b-0", i === 1 && "lg:border-r")}
+            className={cx("border-line px-4 py-14 sm:px-8", i % 2 === 0 && "border-r", i < 2 && "border-b lg:border-b-0", i === 1 && "lg:border-r")}
           >
-            <div className="font-display text-[clamp(40px,5vw,76px)] leading-none tnum drop-shadow-[0_8px_30px_rgba(0,0,0,0.18)] [&_.text-muted]:text-white/60">{it.node}</div>
-            <p className="mt-4 max-w-[260px] text-[14px] leading-relaxed text-white/80">{it.label}</p>
+            <div className="font-display text-[clamp(40px,5vw,76px)] leading-none tnum">{it.node}</div>
+            <p className="mt-4 max-w-[260px] text-[14px] leading-relaxed text-muted">{it.label}</p>
           </Reveal>
         ))}
       </div>
       {ev.data && (
-        <div className="relative mx-auto max-w-[1400px] border-t border-white/15 px-4 py-5 sm:px-8">
-          <Link to="/evaluation" className="group inline-flex items-center gap-2 text-[14px] text-white/85 hover:text-white">
+        <div className="mx-auto max-w-[1400px] border-t border-line px-4 py-5 sm:px-8">
+          <Link to="/evaluation" className="group inline-flex items-center gap-2 text-[14px] text-ink-2 hover:text-ink">
             See the full evaluation — method, every scenario, and its limits <Arrow />
           </Link>
         </div>
@@ -326,21 +317,14 @@ function Stats() {
 
 /* ---------------- Lenses ---------------- */
 
-const TONE = {
-  teal: { text: "text-teal", soft: "bg-teal-soft", bar: "bg-teal" },
-  violet: { text: "text-violet", soft: "bg-violet-soft", bar: "bg-violet" },
-  sky: { text: "text-sky", soft: "bg-sky-soft", bar: "bg-sky" },
-} as const;
-type Tone = keyof typeof TONE;
-
 function Lenses() {
   const lenses = [
-    { n: "01", tone: "teal" as Tone, icon: ShieldPlus, title: "The hospital standard", art: <ArtNews2 />, body: "NEWS2, scored exactly as the Royal College of Physicians charts it, plus a qSOFA sepsis screen. AYU is never less alarming than NEWS2.", ex: [["SpO₂ 93%", "+2"], ["RR 22", "+2"], ["HR 95", "+1"], ["NEWS2", "5 · Medium"]] },
-    { n: "02", tone: "violet" as Tone, icon: Target, title: "This patient's normal", art: <ArtBaseline />, body: "Seven days of their own readings, not the average patient's. The last six hours are left out, so a slow decline can't teach itself to look normal.", ex: [["Ramesh · SBP 150", "his normal"], ["Arjun · SBP 150", "z +4.7"], ["Vikram · HR 78", "+50% for a runner"], ["NEWS2 on all three", "0"]] },
-    { n: "03", tone: "sky" as Tone, icon: TrendingUp, title: "Which way they're heading", art: <ArtTrend />, body: "A three-hour slope on every vital, counted only when it is steep and sustained. A fall that stays inside 'normal' is still a fall.", ex: [["SpO₂", "−0.9%/hr"], ["Window", "3 h"], ["Significance", "≥ 3 SE"], ["False flags at rest", "≈ 0.1%"]] },
+    { n: "01", icon: ShieldPlus, title: "The hospital standard", art: <ArtNews2 />, body: "NEWS2, scored exactly as the Royal College of Physicians charts it, plus a qSOFA sepsis screen. AYU is never less alarming than NEWS2.", ex: [["SpO₂ 93%", "+2"], ["RR 22", "+2"], ["HR 95", "+1"], ["NEWS2", "5 · Medium"]] },
+    { n: "02", icon: Target, title: "This patient's normal", art: <ArtBaseline />, body: "Seven days of their own readings, not the average patient's. The last six hours are left out, so a slow decline can't teach itself to look normal.", ex: [["Ramesh · SBP 150", "his normal"], ["Arjun · SBP 150", "z +4.7"], ["Vikram · HR 78", "+50% for a runner"], ["NEWS2 on all three", "0"]] },
+    { n: "03", icon: TrendingUp, title: "Which way they're heading", art: <ArtTrend />, body: "A three-hour slope on every vital, counted only when it is steep and sustained. A fall that stays inside 'normal' is still a fall.", ex: [["SpO₂", "−0.9%/hr"], ["Window", "3 h"], ["Significance", "≥ 3 SE"], ["False flags at rest", "≈ 0.1%"]] },
   ];
   return (
-    <section data-guide="lenses" className="border-b border-line py-28 sm:py-36">
+    <section className="border-b border-line py-28 sm:py-36">
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <Reveal>
           <div className="eyebrow">How AYU reads a patient</div>
@@ -351,13 +335,11 @@ function Lenses() {
         <div className="mt-20 grid gap-4 md:grid-cols-3">
           {lenses.map((l, i) => (
             <Reveal key={l.n} delay={i * 0.1}>
-              <div onPointerMove={spotlight} className="spotlight group relative flex h-full flex-col overflow-hidden rounded-[28px] border border-line bg-surface p-8 transition-all duration-500 hover:-translate-y-1 hover:border-line-2 hover:shadow-[0_30px_80px_-40px_rgba(0,0,0,0.45)]">
-                <span aria-hidden className={cx("absolute inset-x-0 top-0 h-1", TONE[l.tone].bar)} />
-                <span aria-hidden className={cx("pointer-events-none absolute -top-24 -right-24 size-56 rounded-full opacity-60 blur-3xl", TONE[l.tone].soft)} />
-                <div className="relative flex items-center gap-4">
-                  <span className={cx("font-mono text-[12px]", TONE[l.tone].text)}>{l.n}</span>
+              <div onPointerMove={spotlight} className="spotlight group flex h-full flex-col overflow-hidden rounded-[28px] border border-line bg-surface p-8 transition-colors duration-500 hover:border-line-2">
+                <div className="flex items-center gap-4">
+                  <span className="font-mono text-[12px] text-teal">{l.n}</span>
                   <span className="h-px flex-1 bg-gradient-to-r from-line-2 to-transparent" />
-                  <span className={cx("grid size-10 place-items-center rounded-full transition-all duration-500 group-hover:rotate-[-8deg] group-hover:scale-110", TONE[l.tone].soft, TONE[l.tone].text)}>
+                  <span className="grid size-10 place-items-center rounded-full border border-line text-teal transition-all duration-500 group-hover:rotate-[-8deg] group-hover:border-teal group-hover:bg-teal-soft">
                     <l.icon size={18} strokeWidth={1.6} aria-hidden />
                   </span>
                 </div>
@@ -395,7 +377,7 @@ function Explain() {
   const total = Math.round(DEMO_FACTORS.reduce((s, f) => s + f.pts, 0));
   const offsets = DEMO_FACTORS.map((_, i) => DEMO_FACTORS.slice(0, i).reduce((s, f) => s + f.pts, 0));
   return (
-    <section data-guide="explain" className="border-b border-line py-28 sm:py-36">
+    <section className="border-b border-line py-28 sm:py-36">
       <div className="mx-auto grid max-w-[1400px] items-center gap-16 px-4 sm:px-8 lg:grid-cols-[1fr_1.1fr]">
         <Reveal>
           <div className="eyebrow">Explainable by construction</div>
@@ -408,8 +390,7 @@ function Explain() {
           </p>
         </Reveal>
         <Reveal delay={0.1}>
-          <div className="rounded-[33px] bg-[linear-gradient(135deg,var(--teal),var(--sky),var(--violet))] p-px shadow-[0_40px_100px_-50px_var(--glow)]">
-          <div onPointerMove={spotlight} className="spotlight rounded-[32px] bg-surface p-7 sm:p-10">
+          <div onPointerMove={spotlight} className="spotlight rounded-[32px] border border-line bg-surface p-7 sm:p-10">
             <div className="flex items-end justify-between">
               <div>
                 <div className="eyebrow">AYU score</div>
@@ -445,7 +426,6 @@ function Explain() {
               ))}
             </div>
           </div>
-          </div>
         </Reveal>
       </div>
     </section>
@@ -456,7 +436,7 @@ function Explain() {
 
 function Roles() {
   return (
-    <section data-guide="roles" className="py-28 sm:py-36">
+    <section className="py-28 sm:py-36">
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <Reveal>
           <h2 className="font-display text-[clamp(42px,6vw,96px)] leading-[0.92]">
@@ -464,25 +444,25 @@ function Roles() {
           </h2>
         </Reveal>
         <div className="mt-14 grid gap-4 md:grid-cols-2">
-          <RoleCard to="/doctor" icon={Stethoscope} who="Doctor" line="The ward, sorted by risk. Why each patient is there, and what to do next." meta="10 beds · live" wash="bg-[linear-gradient(135deg,var(--teal-soft),var(--sky-soft))]" art={<DoctorArt className="w-52 sm:w-64" />} />
-          <RoleCard to="/patient" icon={HandHeart} who="Patient" line="Your status in plain words and your medicines for today — in English or हिंदी. Works for ASHA workers too." meta="English · हिंदी" wash="bg-[linear-gradient(135deg,var(--violet-soft),var(--pink-soft))]" art={<PatientArt className="w-56 sm:w-72" />} />
+          <RoleCard to="/doctor" icon={Stethoscope} who="Doctor" line="The ward, sorted by risk. Why each patient is there, and what to do next." meta="10 beds · live" art={<div className="w-40 sm:w-44"><ArtWard /></div>} />
+          <RoleCard to="/patient" icon={HandHeart} who="Patient" line="Your status in plain words and your medicines for today — in English or हिंदी. Works for ASHA workers too." meta="English · हिंदी" art={<ArtBreath />} />
         </div>
       </div>
     </section>
   );
 }
 
-function RoleCard({ to, who, line, meta, art, wash, icon: Icon }: { to: string; who: string; line: string; meta: string; art: ReactNode; wash: string; icon: LucideIcon }) {
+function RoleCard({ to, who, line, meta, art, icon: Icon }: { to: string; who: string; line: string; meta: string; art: ReactNode; icon: LucideIcon }) {
   return (
     <Reveal>
       <Link
         to={to}
         onPointerMove={spotlight}
-        className={cx("spotlight group relative flex min-h-[460px] flex-col justify-between overflow-hidden rounded-[32px] border border-line p-8 transition-all duration-500 hover:-translate-y-1 hover:border-line-2 hover:shadow-[0_40px_90px_-45px_rgba(0,0,0,0.5)] sm:p-11", wash)}
+        className="spotlight group relative flex min-h-[420px] flex-col justify-between overflow-hidden rounded-[32px] border border-line bg-surface p-8 transition-all duration-500 hover:border-line-2 sm:p-11"
       >
-        <div className="flex flex-col-reverse items-start justify-between gap-4 sm:flex-row sm:gap-6">
+        <div className="flex items-start justify-between gap-6">
           <span className="eyebrow flex items-center gap-2 whitespace-nowrap"><Icon size={14} strokeWidth={1.75} aria-hidden />{meta}</span>
-          <div className="self-center transition-transform duration-700 group-hover:scale-105 sm:self-auto">{art}</div>
+          <div className="transition-transform duration-700 group-hover:scale-105">{art}</div>
         </div>
         <div>
           <div className="flex items-end justify-between gap-6">
@@ -500,7 +480,7 @@ function RoleCard({ to, who, line, meta, art, wash, icon: Icon }: { to: string; 
 
 function BigFooter() {
   return (
-    <footer data-guide="footer" className="relative overflow-hidden border-t border-line">
+    <footer className="relative overflow-hidden border-t border-line">
       <div className="mx-auto max-w-[1400px] px-4 pt-20 sm:px-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <p className="max-w-md text-[15px] leading-relaxed">
@@ -510,7 +490,7 @@ function BigFooter() {
         </div>
         <div
           aria-hidden
-          className="text-spectrum mt-16 select-none font-display text-[clamp(120px,30vw,460px)] leading-[0.75] opacity-25 [mask-image:linear-gradient(to_bottom,black_30%,transparent)]"
+          className="mt-16 select-none font-display text-[clamp(120px,30vw,460px)] leading-[0.75] text-transparent [-webkit-text-stroke:1px_var(--line-2)] [mask-image:linear-gradient(to_bottom,black_30%,transparent)]"
         >
           AYU
         </div>
