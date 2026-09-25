@@ -1,12 +1,15 @@
+import { BedDouble, Brain, ClipboardList, FlaskConical, HeartCrack, Pause, Play, RotateCcw, StepForward, Timer, Wind, Zap, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { AlertToaster, LiveStatus } from "../components/alerts";
 import { Shell } from "../components/Shell";
+import { SCENARIO_ICON, ic } from "../components/icons";
 import { EmptyState, ErrorState, Eyebrow, LevelDot, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
 import { LEVEL_STYLE, fmtTime } from "../lib/format";
 import { useLive } from "../lib/live";
 
 const SPEEDS = [1, 5, 20];
+const SYMPTOM_ICON: Record<string, LucideIcon> = { chest_pain: HeartCrack, breathlessness: Wind, confusion: Brain, severe_headache: Zap };
 const QUICK_SYMPTOMS: [string, string][] = [
   ["chest_pain", "Chest pain"],
   ["breathlessness", "Breathlessness"],
@@ -58,7 +61,8 @@ export default function Demo() {
               <div className="eyebrow">Simulated time</div>
               <div className="font-mono text-[24px] leading-none tnum">{sim ? fmtTime(sim.sim_time) : "—"}<span className="ml-1 text-[12px] text-muted">IST</span></div>
             </div>
-            <div className="flex rounded-full border border-line p-1" role="group" aria-label="Speed">
+            <div className="flex items-center rounded-full border border-line p-1" role="group" aria-label="Speed">
+              <Timer {...ic(15)} className="mx-2 text-muted" />
               {SPEEDS.map((sp) => (
                 <button
                   key={sp}
@@ -73,11 +77,13 @@ export default function Demo() {
             <button
               type="button"
               onClick={() => run("pause", () => (sim?.paused ? api.resume() : api.pause()))}
-              className="h-12 rounded-full border border-line-2 px-5 text-[14px] font-medium hover:border-ink"
+              className="inline-flex h-12 items-center gap-2 rounded-full border border-line-2 px-5 text-[14px] font-medium hover:border-ink"
             >
+              {sim?.paused ? <Play {...ic(15)} /> : <Pause {...ic(15)} />}
               {sim?.paused ? "Resume" : "Pause"}
             </button>
-            <button type="button" onClick={() => run("step", () => api.step())} className="h-12 rounded-full border border-line px-5 text-[14px] text-muted hover:text-ink">
+            <button type="button" onClick={() => run("step", () => api.step())} className="inline-flex h-12 items-center gap-2 rounded-full border border-line px-5 text-[14px] text-muted hover:text-ink">
+              <StepForward {...ic(15)} />
               +5 min
             </button>
             {confirmReset ? (
@@ -92,7 +98,8 @@ export default function Demo() {
                 <button type="button" onClick={() => setConfirmReset(false)} className="h-12 px-3 text-[13px] text-muted hover:text-ink">Cancel</button>
               </span>
             ) : (
-              <button type="button" onClick={() => setConfirmReset(true)} className="h-12 rounded-full border border-critical/40 px-5 text-[14px] text-critical hover:bg-critical-soft">
+              <button type="button" onClick={() => setConfirmReset(true)} className="group inline-flex h-12 items-center gap-2 rounded-full border border-critical/40 px-5 text-[14px] text-critical hover:bg-critical-soft">
+                <RotateCcw {...ic(15)} className="transition-transform duration-500 group-hover:-rotate-180" />
                 Reset
               </button>
             )}
@@ -105,7 +112,7 @@ export default function Demo() {
         <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_420px] [&>*]:min-w-0">
           {/* Patients */}
           <section>
-            <Eyebrow>1 · Pick a patient</Eyebrow>
+            <Eyebrow icon={BedDouble}>1 · Pick a patient</Eyebrow>
             {patients.error && !patients.data ? (
               <div className="mt-4"><ErrorState error={patients.error} onRetry={patients.reload} /></div>
             ) : !patients.data ? (
@@ -147,7 +154,7 @@ export default function Demo() {
 
           {/* Scenarios */}
           <section>
-            <Eyebrow>2 · Inject for {current?.name ?? selected}</Eyebrow>
+            <Eyebrow icon={FlaskConical}>2 · Inject for {current?.name ?? selected}</Eyebrow>
             <div className="mt-4 space-y-2">
               {!scenarios.data ? (
                 Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)
@@ -155,6 +162,7 @@ export default function Demo() {
                 <EmptyState title="No scenarios" />
               ) : (
                 scenarios.data.map((sc) => {
+                  const Icon = SCENARIO_ICON[sc.key] ?? FlaskConical;
                   const suits = sc.best_for.includes(selected);
                   const on = active === sc.key;
                   return (
@@ -168,7 +176,10 @@ export default function Demo() {
                         on ? "border-teal bg-teal-soft" : sc.key === "recover" ? "border-stable/30 hover:bg-stable-soft" : "border-line bg-surface hover:border-line-2",
                       )}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className={cx("grid size-7 place-items-center rounded-full", on ? "bg-teal text-bg" : "bg-surface-2 text-ink-2")}>
+                          <Icon {...ic(15)} />
+                        </span>
                         <span className="text-[15px] font-medium">{sc.label}</span>
                         {suits && <span className="rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-teal">best fit</span>}
                         {on && <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.12em] text-teal">running</span>}
@@ -181,19 +192,23 @@ export default function Demo() {
             </div>
 
             <div className="mt-6">
-              <Eyebrow>3 · Or report a symptom now</Eyebrow>
+              <Eyebrow icon={ClipboardList}>3 · Or report a symptom now</Eyebrow>
               <div className="mt-3 flex flex-wrap gap-2">
-                {QUICK_SYMPTOMS.map(([key, label]) => (
+                {QUICK_SYMPTOMS.map(([key, label]) => {
+                  const Icon = SYMPTOM_ICON[key];
+                  return (
                   <button
                     key={key}
                     type="button"
                     disabled={!!busy}
                     onClick={() => run(`${label} reported`, () => api.reportSymptoms(selected, [key], "staff", "Reported from the demo panel"))}
-                    className="h-9 rounded-full border border-line px-4 text-[13px] hover:border-line-2 disabled:opacity-60"
+                    className="inline-flex h-9 items-center gap-2 rounded-full border border-line px-4 text-[13px] hover:border-line-2 disabled:opacity-60"
                   >
+                    {Icon && <Icon {...ic(14)} className="text-muted" />}
                     {label}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </section>

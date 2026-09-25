@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { BellOff, ChartColumn, FlaskConical, Footprints, Moon, ScrollText, ShieldAlert, Timer, Trophy, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CountUp } from "../components/motion";
@@ -27,7 +28,7 @@ export default function Evaluation() {
   return (
     <Shell>
       <div className="mx-auto max-w-[1400px] px-4 pt-10 pb-24 sm:px-8">
-        <Eyebrow>Evaluation · AYU vs threshold-only NEWS2</Eyebrow>
+        <Eyebrow icon={FlaskConical}>Evaluation · AYU vs threshold-only NEWS2</Eyebrow>
         <h1 className="mt-3 font-display text-[clamp(48px,7vw,112px)] leading-[0.9]">
           The <span className="accent text-shine">proof.</span>
         </h1>
@@ -86,13 +87,13 @@ function Body({ r, tier, setTier }: { r: EvalResult; tier: Tier; setTier: (t: Ti
 
       {/* Headline numbers */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Median head start" value={<CountUp key={`lead-${tier}`} value={Math.round((s.lead_h_median ?? 0) * 60)} suffix=" min" />}
+        <Stat icon={Timer} label="Median head start" value={<CountUp key={`lead-${tier}`} value={Math.round((s.lead_h_median ?? 0) * 60)} suffix=" min" />}
           note={`AYU escalates before NEWS2 — range ${fmtLead(s.lead_h_min)} to ${fmtLead(s.lead_h_max)}`} tone="teal" />
-        <Stat label="Who escalated first" value={<><CountUp key={`first-${tier}`} value={s.ayu_first} /><span className="text-[0.5em] text-muted"> / {r.summary.runs}</span></>}
+        <Stat icon={Trophy} label="Who escalated first" value={<><CountUp key={`first-${tier}`} value={s.ayu_first} /><span className="text-[0.5em] text-muted"> / {r.summary.runs}</span></>}
           note={`AYU first · ${s.ties} tied · ${s.news2_first} NEWS2 first`} />
-        <Stat label="NEWS2 never escalated" value={<CountUp key={`never-${tier}`} value={s.news2_never} />}
+        <Stat icon={ShieldAlert} label="NEWS2 never escalated" value={<CountUp key={`never-${tier}`} value={s.news2_never} />}
           note={`of ${r.summary.runs} deteriorations within ${r.config.horizon_h} h; AYU missed ${s.ayu_never}`} />
-        <Stat label="False alarms at rest" value={<><span className="text-teal">{s.rest_ayu_alarms}</span><span className="text-[0.5em] text-muted"> AYU · </span>{s.rest_news2_alarms}<span className="text-[0.5em] text-muted"> NEWS2</span></>}
+        <Stat icon={BellOff} label="False alarms at rest" value={<><span className="text-teal">{s.rest_ayu_alarms}</span><span className="text-[0.5em] text-muted"> AYU · </span>{s.rest_news2_alarms}<span className="text-[0.5em] text-muted"> NEWS2</span></>}
           note={`over ${r.summary.rest_patient_days} patient-days with nothing wrong`} />
       </div>
 
@@ -100,7 +101,7 @@ function Body({ r, tier, setTier }: { r: EvalResult; tier: Tier; setTier: (t: Ti
       <Reveal>
         <Card className="mt-6 p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <Eyebrow>Hours from onset to escalation · median per scenario</Eyebrow>
+            <Eyebrow icon={ChartColumn}>Hours from onset to escalation · median per scenario</Eyebrow>
             <div className="flex gap-4 text-[12px] text-muted">
               <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[3px]" style={{ background: NEWS2_COLOR }} />Threshold-only NEWS2</span>
               <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[3px]" style={{ background: AYU_COLOR }} />AYU (baseline + trend)</span>
@@ -129,7 +130,7 @@ function Body({ r, tier, setTier }: { r: EvalResult; tier: Tier; setTier: (t: Ti
       {/* Table */}
       <Reveal>
         <Card className="mt-6 overflow-x-auto p-6">
-          <Eyebrow>Per scenario · {r.config.seeds} seeds each</Eyebrow>
+          <Eyebrow icon={ScrollText}>Per scenario · {r.config.seeds} seeds each</Eyebrow>
           <table className="mt-4 w-full min-w-[760px] text-[14px]">
             <thead>
               <tr className="text-left font-mono text-[11px] uppercase tracking-[0.1em] text-muted">
@@ -172,7 +173,7 @@ function Body({ r, tier, setTier }: { r: EvalResult; tier: Tier; setTier: (t: Ti
 
       <Reveal>
         <Card className="mt-6 p-6">
-          <Eyebrow>Method and limits</Eyebrow>
+          <Eyebrow icon={ShieldAlert}>Method and limits</Eyebrow>
           <ul className="mt-4 grid gap-3 text-[14px] leading-relaxed text-ink-2 md:grid-cols-2">
             <li>Each run: 7 days of the patient's own normal readings, then the scenario, stepped every {r.config.minutes_per_tick} minutes for {r.config.horizon_h} hours — the same generator and scenario definitions as the live ward.</li>
             <li>Two tiers compare like with like: urgent review (NEWS2 ≥ 5 vs AYU Warning), and each system's own first alert (NEWS2 ≥ 5 or a single 3 vs AYU Watch confirmed on the next reading).</li>
@@ -187,10 +188,11 @@ function Body({ r, tier, setTier }: { r: EvalResult; tier: Tier; setTier: (t: Ti
   );
 }
 
-function Stat({ label, value, note, tone }: { label: string; value: React.ReactNode; note: string; tone?: "teal" }) {
+function Stat({ label, value, note, tone, icon: Icon }: { label: string; value: React.ReactNode; note: string; tone?: "teal"; icon: LucideIcon }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl border border-line bg-surface p-6">
-      <div className="eyebrow">{label}</div>
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="group relative overflow-hidden rounded-3xl border border-line bg-surface p-6 transition-colors hover:border-line-2">
+      <Icon size={72} strokeWidth={1} aria-hidden className="pointer-events-none absolute -right-3 -bottom-3 text-teal opacity-[0.07] transition-all duration-700 group-hover:-rotate-6 group-hover:opacity-[0.14]" />
+      <div className="eyebrow flex items-center gap-2"><Icon size={13} strokeWidth={1.75} aria-hidden />{label}</div>
       <div className={cx("mt-3 font-display text-[clamp(40px,4vw,60px)] leading-none tnum", tone === "teal" && "text-teal")}>{value}</div>
       <p className="mt-3 text-[13px] leading-relaxed text-muted">{note}</p>
     </motion.div>
@@ -203,7 +205,7 @@ function Example({ r }: { r: EvalResult }) {
   const newsAt = pts.find((p) => p.news2 >= 5)?.h;
   return (
     <Card className="p-6">
-      <Eyebrow>One run · {r.example.patient_name}, sepsis</Eyebrow>
+      <Eyebrow icon={Footprints}>One run · {r.example.patient_name}, sepsis</Eyebrow>
       <p className="mt-2 text-[13px] text-muted">Same patient, same readings, two scores. Dashed lines mark each one's urgent threshold.</p>
       <div className="mt-4 text-[12px] font-mono text-teal">AYU score (Warning at 50)</div>
       <div className="h-[150px]">
@@ -249,7 +251,7 @@ function Rest({ r, tier }: { r: EvalResult; tier: Tier }) {
   const s = r.summary[tier];
   return (
     <Card className="h-full p-6">
-      <Eyebrow>At rest · nothing wrong</Eyebrow>
+      <Eyebrow icon={Moon}>At rest · nothing wrong</Eyebrow>
       <p className="mt-2 text-[13px] text-muted">{r.summary.rest_patient_days} patient-days with no scenario. Every alarm here is a false one.</p>
       <div className="mt-5 grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-teal-soft p-4">
