@@ -87,6 +87,31 @@ Measured on the seeded cohort (7 simulated hours, all scenarios running at once)
 \*NEWS2 escalation = total ≥ 5 or any single parameter scoring 3. One alert per deteriorating patient; zero alerts on the
 four patients left at rest.
 
+**Before going on stage:** open `/demo` and press **Reset** — a fresh 7-day history, no alerts, 1× speed.
+
+## Explanations (Phase 4)
+
+Every score comes with a plain-language explanation: 2–3 sentences for the doctor and one sentence for the patient,
+in **English or हिंदी** (toggle on the patient page and in the patient portal).
+
+- **Gemini** writes it when `GEMINI_API_KEY` is set in `.env` (model from `GEMINI_MODEL`). The system prompt forbids
+  diagnosis, requires an urgency consistent with AYU's, and asks for JSON only.
+- **Privacy boundary:** Gemini receives the score, level, urgency and contributing factors only — never a name, age,
+  bed or ID (covered by a test).
+- **Never blocks the demo:** each call is capped at `GEMINI_TIMEOUT_S` (4 s); a reply that isn't valid JSON (or isn't
+  Devanagari when Hindi was asked for) is discarded; after any failure Gemini is skipped for 60 s. In every one of those
+  cases AYU's built-in explanation answers instantly. The card shows which one you are reading.
+- The built-in Hindi is generated from each factor's structured data (vital, value, baseline, slope, medicine,
+  symptom), not machine-translated.
+
+## Patient portal
+
+`/patient` → pick a name. Plain-language status (from the live explanation), latest readings, today's medicines with
+**Mark as taken**, **Log a reading** (°C or °F), and a **symptom checklist** in English or Hindi where red-flag symptoms
+warn the patient to tell a nurse at once. **ASHA worker mode** records every entry with source `asha`, for village
+health workers using a shared phone. Everything submitted re-scores the patient immediately and reaches the doctor's
+dashboard live.
+
 ### API
 
 | Method | Path | What |
@@ -94,6 +119,8 @@ four patients left at rest.
 | GET | `/patients`, `/patients/{id}` | Live list (highest risk first) and one patient |
 | GET | `/patients/{id}/risk` | Full explainable assessment |
 | GET | `/patients/{id}/vitals?range=6h` · `/risk/history` · `/medications` · `/symptoms` | History |
+| GET | `/patients/{id}/explanation?lang=en\|hi` | Explanation for doctor and patient (Gemini or built-in) |
+| POST | `/patients/{id}/vitals` | Log a reading by hand (patient / ASHA / staff); re-scored at once |
 | POST | `/patients/{id}/symptoms` | Report symptoms; re-scored at once |
 | POST | `/doses` | Mark a dose taken / missed |
 | GET | `/alerts?status=open` | Alerts |
@@ -106,6 +133,7 @@ four patients left at rest.
 ```
 backend/app/
   risk/       the engine (weights.py, news2, qsofa, baseline, trend, adherence, symptoms, engine)
+  explain/    explanations: built-in English/Hindi templates + Gemini with timeout and fallback
   seed/       demo cohort + vitals generator
   sim/        live simulator + scenarios (alerts, hysteresis, cooldown)
   services/   database ↔ engine glue, WebSocket hub
@@ -125,5 +153,5 @@ frontend/src/
 - [x] Frontend (built ahead of Phase 2) — dark premium UI: landing with live canvas hero and scroll story, ward
       dashboard, patient detail with baseline-banded charts, patient view in English/हिंदी
 - [x] Phase 3 — live dashboard and patient detail over WebSocket, alerts panel with toasts and sound
-- [ ] Phase 4 — explanations (Gemini + offline fallback), Hindi, patient portal
+- [x] Phase 4 — explanations (Gemini + offline fallback), Hindi, patient portal with ASHA mode
 - [ ] Phase 5 — evaluation page, polish
