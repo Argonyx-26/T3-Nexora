@@ -2,6 +2,7 @@ import { MotionConfig } from "framer-motion";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import Demo from "./pages/Demo";
 import Doctor from "./pages/Doctor";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
@@ -25,6 +26,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/doctor" element={<Doctor />} />
+            <Route path="/demo" element={<Demo />} />
             <Route path="/patients/:id" element={<PatientDetail />} />
             <Route path="/patient" element={<PatientPicker />} />
             <Route path="/patient/:id" element={<PatientHome />} />
