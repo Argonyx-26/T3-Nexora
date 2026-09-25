@@ -206,6 +206,25 @@ body {
 .live-dot {
   animation: ayu-blink 1.6s ease-in-out infinite;
 }
+/* The hero monitor's HTML readout; VitalField sets --vf to the trace colour and data-beat on each R peak. */
+.vf-readout {
+  --vf: var(--teal);
+}
+.vf-hr {
+  color: var(--vf);
+  transition: color 0.8s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), text-shadow 0.25s ease;
+  transform-origin: right bottom;
+  display: inline-block;
+}
+.vf-readout[data-beat="1"] .vf-hr {
+  transform: scale(1.04);
+  text-shadow: 0 0 28px color-mix(in srgb, var(--vf) 55%, transparent);
+}
+.vf-chip {
+  color: var(--vf);
+  background: color-mix(in srgb, var(--vf) 13%, transparent);
+  transition: color 0.8s ease, background-color 0.8s ease;
+}
 @media (prefers-reduced-motion: reduce) {
   .pulse-critical, .live-dot, .text-shine, .marquee { animation: none; }
 }

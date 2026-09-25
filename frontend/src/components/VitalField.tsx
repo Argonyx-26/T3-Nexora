@@ -1,34 +1,61 @@
 import { useEffect, useRef } from "react";
 
 /*
- * The hero's living backdrop: a ward of ECG traces stacked in depth, drawn to a canvas.
- * One patient's trace slowly deteriorates — teal → amber → red, faster and larger — while a
- * label beside it follows AYU's level. The pointer lifts the traces it passes over.
+ * The hero's living backdrop: a bedside monitor. One pen sweeps left to right at a calm
+ * paper speed, leaving a trace that fades behind it and erasing a small gap ahead, the
+ * way a real ICU monitor does. Over each loop the patient slowly deteriorates — the heart
+ * rate climbs from 64 to ~104 and the trace turns teal → amber → orange — while the
+ * readout shows AYU escalating to Warning and NEWS2 still reading Low. Then the doctor
+ * reviews and it settles. A few faint, slow traces behind it are the rest of the ward.
  */
 
 type RGB = [number, number, number];
 const TEAL: RGB = [45, 212, 191];
+const TEAL_LIGHT: RGB = [15, 118, 110];
 const AMBER: RGB = [251, 191, 36];
+const AMBER_LIGHT: RGB = [180, 83, 9];
 const ORANGE: RGB = [251, 146, 60];
+const ORANGE_LIGHT: RGB = [194, 65, 12];
 const RED: RGB = [248, 113, 113];
-const CYCLE_S = 16; // one deterioration → reset loop
+
+const LOOP_S = 26; // calm → slide → alert → reviewed
+const SWEEP_S = 4.6; // seconds for the pen to cross the monitor
+const STEP = 2; // px per stored sample
+const GAP_PX = 46; // erased gap ahead of the pen
 
 const g = (x: number, m: number, s: number) => Math.exp(-(((x - m) / s) ** 2));
 /** One heartbeat, phase 0..1: P wave, QRS complex, T wave. */
 const ecg = (p: number) =>
-  0.12 * g(p, 0.16, 0.03) - 0.14 * g(p, 0.3, 0.009) + g(p, 0.325, 0.011) - 0.26 * g(p, 0.35, 0.01) + 0.26 * g(p, 0.56, 0.05);
+  0.11 * g(p, 0.14, 0.035) - 0.12 * g(p, 0.285, 0.012) + g(p, 0.31, 0.014) - 0.24 * g(p, 0.335, 0.013) + 0.24 * g(p, 0.55, 0.06);
 
 const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const smooth = (t: number) => t * t * (3 - 2 * t);
+const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+const rgb = (c: RGB, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 
-function hotState(d: number): { rgb: RGB; label: string } {
-  if (d < 0.35) return { rgb: TEAL, label: "STABLE" };
-  if (d < 0.6) return { rgb: mix(TEAL, AMBER, (d - 0.35) / 0.25), label: "WATCH" };
-  if (d < 0.82) return { rgb: mix(AMBER, ORANGE, (d - 0.6) / 0.22), label: "WARNING" };
-  return { rgb: mix(ORANGE, RED, Math.min(1, (d - 0.82) / 0.12)), label: "CRITICAL" };
+/** Deterioration 0..1 at loop time `u` (seconds). */
+function deterioration(u: number) {
+  if (u < 6) return 0;
+  if (u < 19) return smooth((u - 6) / 13);
+  if (u < 21.5) return 1;
+  return 1 - smooth((u - 21.5) / 4.5);
+}
+
+// Tops out at Warning on purpose: a heart rate of ~104 alone is a reason to review, not an emergency.
+function stateFor(d: number, dark: boolean): { rgb: RGB; ayu: string } {
+  const base = dark ? TEAL : TEAL_LIGHT;
+  const amber = dark ? AMBER : AMBER_LIGHT;
+  const orange = dark ? mix(ORANGE, RED, 0.3) : ORANGE_LIGHT;
+  if (d < 0.3) return { rgb: base, ayu: "Stable" };
+  if (d < 0.6) return { rgb: mix(base, amber, (d - 0.3) / 0.3), ayu: "Watch" };
+  return { rgb: mix(amber, orange, clamp01((d - 0.6) / 0.3)), ayu: "Warning" };
 }
 
 export function VitalField({ className }: { className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const hrRef = useRef<HTMLSpanElement>(null);
+  const ayuRef = useRef<HTMLSpanElement>(null);
+  const readoutRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -39,21 +66,32 @@ export function VitalField({ className }: { className?: string }) {
 
     let w = 0;
     let h = 0;
-    let bg = "#05070a";
+    let x0 = 0; // the monitor's left edge: on wide screens it keeps clear of the hero copy
     let dark = true;
     const readTheme = () => {
-      const cs = getComputedStyle(document.documentElement);
-      bg = cs.getPropertyValue("--bg").trim() || bg;
       dark = document.documentElement.classList.contains("dark");
     };
+
+    // The trace buffer: one sample per STEP px — its height, colour and when it was written.
+    let cols = 0;
+    let ys = new Float32Array(0);
+    let cs: RGB[] = [];
+    let born = new Float64Array(0);
+    let penCol = 0;
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const r = canvas.getBoundingClientRect();
       w = r.width;
       h = r.height;
+      x0 = w >= 1024 ? Math.round(Math.max(w * 0.36, 580)) : 0;
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cols = Math.ceil((w - x0) / STEP) + 1;
+      ys = new Float32Array(cols).fill(h * 0.63);
+      cs = Array.from({ length: cols }, () => TEAL);
+      born = new Float64Array(cols).fill(-1e9);
+      penCol = 0;
     };
     readTheme();
     resize();
@@ -63,112 +101,207 @@ export function VitalField({ className }: { className?: string }) {
     const mo = new MutationObserver(readTheme);
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
 
-    const mouse = { x: -9999, y: -9999, sx: 0.5, sy: 0.5, tx: 0.5, ty: 0.5 };
+    const mouse = { tx: 0.5, ty: 0.5, sx: 0.5, sy: 0.5 };
     const onMove = (e: PointerEvent) => {
-      const r = canvas.getBoundingClientRect();
-      mouse.x = e.clientX - r.left;
-      mouse.y = e.clientY - r.top;
-      mouse.tx = Math.min(1, Math.max(0, mouse.x / Math.max(1, r.width)));
-      mouse.ty = Math.min(1, Math.max(0, mouse.y / Math.max(1, r.height)));
-    };
-    const onLeave = () => {
-      mouse.x = mouse.y = -9999;
-      mouse.tx = mouse.ty = 0.5;
+      mouse.tx = e.clientX / Math.max(1, window.innerWidth);
+      mouse.ty = e.clientY / Math.max(1, window.innerHeight);
     };
     window.addEventListener("pointermove", onMove, { passive: true });
-    document.addEventListener("pointerleave", onLeave);
 
     let visible = true;
     const io = new IntersectionObserver(([e]) => (visible = e.isIntersecting));
     io.observe(canvas);
 
-    const seeds = Array.from({ length: 40 }, (_, i) => ({ phase: (i * 0.618) % 1, rate: 0.55 + ((i * 0.37) % 1) * 0.35, wob: (i * 1.7) % 6.28 }));
+    // Signal state, integrated sample by sample so the rhythm never jumps when the rate changes.
+    let phase = 0.2;
+    let lastT = 0;
+    let beatAt = -10; // time of the last R peak, for the pulse ring and the readout's beat
 
-    const draw = (tMs: number) => {
-      const t = tMs / 1000;
-      mouse.sx += (mouse.tx - mouse.sx) * 0.05;
-      mouse.sy += (mouse.ty - mouse.sy) * 0.05;
-      ctx.clearRect(0, 0, w, h);
+    const baseline = () => h * 0.63;
+    const amp = () => Math.min(h * 0.24, 130);
 
-      const lines = w < 640 ? 13 : w < 1100 ? 18 : 24;
-      const hot = Math.round(lines * 0.64);
-      const cyc = (t % CYCLE_S) / CYCLE_S;
-      const d = reduce ? 0.7 : cyc < 0.85 ? cyc / 0.85 : 1 - (cyc - 0.85) / 0.15; // rise, then recover
-      const hs = hotState(d);
-      const step = w < 640 ? 5 : 4;
+    const sample = (t: number) => {
+      const d = reduce ? 0.7 : deterioration(t % LOOP_S);
+      return { d, hr: 64 + d * 40 };
+    };
 
-      for (let i = 0; i < lines; i++) {
-        const depth = i / (lines - 1); // 0 = back, 1 = front
-        const y0 = h * 0.12 + depth * h * 0.8 + (mouse.sy - 0.5) * 18 * depth;
-        const par = (mouse.sx - 0.5) * -40 * depth;
-        const isHot = i === hot;
-        const s = seeds[i];
-        const period = (220 + depth * 180) * (isHot ? 1 - d * 0.35 : 1);
-        const amp = (7 + depth * 30) * (isHot ? 1 + d * 0.9 : 1);
-        const speed = s.rate * (isHot ? 1 + d * 0.8 : 1);
+    const write = (t: number, dt: number) => {
+      const { d, hr } = sample(t);
+      const prev = phase;
+      phase = (phase + (dt * hr) / 60) % 1;
+      if (prev < 0.31 && (phase >= 0.31 || phase < prev)) beatAt = t;
+      const wander = Math.sin(t * 0.7) * 0.03 + Math.sin(t * 0.23) * 0.02;
+      const v = ecg(phase) * (1 + d * 0.25) + wander;
+      ys[penCol] = baseline() - v * amp();
+      cs[penCol] = stateFor(d, dark).rgb;
+      born[penCol] = t;
+      penCol = (penCol + 1) % cols;
+    };
 
+    const drawGrid = () => {
+      const sq = 28;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = dark ? "rgba(45,212,191,0.035)" : "rgba(15,118,110,0.05)";
+      ctx.beginPath();
+      const top = h * 0.3;
+      for (let x = x0; x <= w; x += sq) {
+        ctx.moveTo(Math.round(x) + 0.5, top);
+        ctx.lineTo(Math.round(x) + 0.5, h);
+      }
+      for (let y = top; y <= h; y += sq) {
+        ctx.moveTo(x0, Math.round(y) + 0.5);
+        ctx.lineTo(w, Math.round(y) + 0.5);
+      }
+      ctx.stroke();
+    };
+
+    const drawWard = (t: number) => {
+      // Five faint, slow traces in depth — the rest of the ward, breathing quietly.
+      const n = 5;
+      const base = dark ? TEAL : TEAL_LIGHT;
+      for (let i = 0; i < n; i++) {
+        const depth = i / (n - 1);
+        const y0 = h * 0.16 + depth * h * 0.26 + (mouse.sy - 0.5) * 10 * (1 - depth);
+        const par = (mouse.sx - 0.5) * -24 * (1 - depth);
+        const period = 360 + i * 70;
         ctx.beginPath();
-        let first = true;
-        for (let x = -20; x <= w + 20; x += step) {
-          const u = x / w;
-          const env = 0.18 + 0.82 * Math.exp(-(((u - 0.62) / 0.34) ** 2)); // the Unknown Pleasures swell
-          const p = (((x - par) / period + t * speed + s.phase) % 1 + 1) % 1;
-          let v = ecg(p) * env * amp;
-          v += Math.sin(x * 0.013 + t * 0.9 + s.wob) * 1.2 * (0.4 + depth);
-          const dx = x - mouse.x;
-          const dy = y0 - mouse.y;
-          const near = Math.exp(-(dx * dx) / (2 * 140 * 140) - (dy * dy) / (2 * 90 * 90));
-          v *= 1 + near * 1.6;
-          const y = y0 - v;
-          if (first) {
-            ctx.moveTo(x, y);
-            first = false;
-          } else ctx.lineTo(x, y);
+        for (let x = -10; x <= w + 10; x += 6) {
+          const p = (((x + par) / period - t * (0.08 + i * 0.012)) % 1 + 1) % 1;
+          const y = y0 - ecg(p) * (11 + depth * 11) - Math.sin(x * 0.006 + t * 0.4 + i) * 2;
+          if (x === -10) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
         }
-        // occlude the lines behind, then stroke
-        ctx.lineTo(w + 20, h + 20);
-        ctx.lineTo(-20, h + 20);
-        ctx.closePath();
-        ctx.fillStyle = bg;
-        ctx.fill();
-
-        if (isHot) {
-          const [r, g2, b] = hs.rgb;
-          ctx.strokeStyle = `rgba(${r | 0},${g2 | 0},${b | 0},0.95)`;
-          ctx.lineWidth = 2.6;
-          ctx.shadowColor = `rgba(${r | 0},${g2 | 0},${b | 0},0.9)`;
-          ctx.shadowBlur = 20 + d * 24;
-        } else {
-          const a = (dark ? 0.2 : 0.22) + depth * (dark ? 0.62 : 0.5);
-          ctx.strokeStyle = `rgba(${TEAL[0]},${TEAL[1]},${TEAL[2]},${a})`;
-          ctx.lineWidth = 1.1 + depth * 1.1;
-          ctx.shadowBlur = 0;
-        }
+        ctx.strokeStyle = rgb(base, (dark ? 0.06 : 0.07) + depth * 0.06);
+        ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        if (isHot && w > 520) {
-          const [r, g2, b] = hs.rgb;
-          const lx = w * 0.86;
-          ctx.font = '500 11px "Geist Mono Variable", ui-monospace, monospace';
-          ctx.fillStyle = `rgba(${r | 0},${g2 | 0},${b | 0},0.95)`;
-          ctx.textAlign = "right";
-          ctx.fillText(`BED B-02 · AYU ${hs.label}`, lx, y0 - amp * 1.25 - 12);
-          ctx.beginPath();
-          ctx.arc(lx + 10, y0 - amp * 1.25 - 16, 3 + (Math.sin(t * 6) + 1) * 1.2, 0, Math.PI * 2);
-          ctx.fill();
-        }
       }
     };
 
+    const drawTrace = (t: number) => {
+      const gapCols = Math.ceil(GAP_PX / STEP);
+      const life = SWEEP_S * 1.05;
+      const alive = (c: number) => (c - penCol + cols) % cols >= gapCols && t - born[c] <= life;
+      // Chunks share one alpha and colour: cheap to draw, and the fade still reads smooth.
+      const CH = 6;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      for (let pass = 0; pass < 2; pass++) {
+        for (let c0 = 0; c0 < cols - 1; c0 += CH) {
+          const mid = Math.min(cols - 1, c0 + (CH >> 1));
+          if (!alive(mid)) continue;
+          const fade = clamp01(1 - (t - born[mid]) / life);
+          const alpha = 0.1 + 0.9 * fade ** 1.4;
+          ctx.beginPath();
+          let started = false;
+          for (let c = c0; c <= Math.min(cols - 1, c0 + CH); c++) {
+            if (!alive(c)) {
+              started = false;
+              continue;
+            }
+            const x = x0 + c * STEP;
+            if (!started) {
+              ctx.moveTo(x, ys[c]);
+              started = true;
+            } else ctx.lineTo(x, ys[c]);
+          }
+          if (pass === 0) {
+            ctx.strokeStyle = rgb(cs[mid], alpha * (dark ? 0.16 : 0.1)); // soft phosphor glow
+            ctx.lineWidth = 9;
+          } else {
+            ctx.strokeStyle = rgb(cs[mid], alpha);
+            ctx.lineWidth = 2.2;
+          }
+          ctx.stroke();
+        }
+      }
+
+      // The pen head: a bright point with a halo, and a ring on every heartbeat.
+      const head = (penCol - 1 + cols) % cols;
+      const hx = x0 + head * STEP;
+      const hy = ys[head];
+      const c = cs[head];
+      const halo = ctx.createRadialGradient(hx, hy, 0, hx, hy, 34);
+      halo.addColorStop(0, rgb(c, 0.55));
+      halo.addColorStop(1, rgb(c, 0));
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(hx, hy, 34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = dark ? "#ffffff" : rgb(c);
+      ctx.beginPath();
+      ctx.arc(hx, hy, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      const since = t - beatAt;
+      if (since >= 0 && since < 0.7) {
+        const k = since / 0.7;
+        ctx.strokeStyle = rgb(c, 0.5 * (1 - k));
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 6 + k * 30, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    };
+
+    // The readout is HTML (crisp type, above the hero's fades); only touch the DOM when it changes.
+    let shownHr = -1;
+    let shownAyu = "";
+    let shownColor = "";
+    const updateReadout = (t: number) => {
+      const { d, hr } = sample(t);
+      const st = stateFor(d, dark);
+      const r = Math.round(hr);
+      const color = rgb(st.rgb);
+      if (hrRef.current && r !== shownHr) {
+        hrRef.current.textContent = String(r);
+        shownHr = r;
+      }
+      if (ayuRef.current && st.ayu !== shownAyu) {
+        ayuRef.current.textContent = st.ayu;
+        shownAyu = st.ayu;
+      }
+      if (readoutRef.current) {
+        if (color !== shownColor) {
+          readoutRef.current.style.setProperty("--vf", color);
+          shownColor = color;
+        }
+        readoutRef.current.dataset.beat = t - beatAt < 0.18 ? "1" : "0";
+      }
+    };
+
+    const render = (t: number) => {
+      ctx.clearRect(0, 0, w, h);
+      drawGrid();
+      drawWard(t);
+      drawTrace(t);
+      updateReadout(t);
+    };
+
+    const frame = (tMs: number) => {
+      const t = tMs / 1000;
+      mouse.sx += (mouse.tx - mouse.sx) * 0.04;
+      mouse.sy += (mouse.ty - mouse.sy) * 0.04;
+      if (!lastT) lastT = t;
+      // Advance the pen by however many samples this frame's time covers (skipping ahead after a stall).
+      const dtCol = SWEEP_S / cols;
+      if (t - lastT > 1) lastT = t - dtCol;
+      while (lastT + dtCol <= t) {
+        lastT += dtCol;
+        write(lastT, dtCol);
+      }
+      render(lastT);
+    };
+
     let raf = 0;
-    // Off-screen frames are skipped; hidden tabs are already throttled by the browser itself.
     const loop = (now: number) => {
-      if (visible) draw(now);
+      if (visible) frame(now);
       raf = requestAnimationFrame(loop);
     };
-    if (reduce) draw(9000);
-    else raf = requestAnimationFrame(loop);
+    if (reduce) {
+      // One still, full sweep: the trace without the motion.
+      const dtCol = SWEEP_S / cols;
+      for (let i = 0; i < cols; i++) write(10 + i * dtCol, dtCol);
+      render(10 + cols * dtCol);
+    } else raf = requestAnimationFrame(loop);
 
     return () => {
       cancelAnimationFrame(raf);
@@ -176,9 +309,27 @@ export function VitalField({ className }: { className?: string }) {
       mo.disconnect();
       io.disconnect();
       window.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerleave", onLeave);
     };
   }, []);
 
-  return <canvas ref={ref} className={className} aria-hidden />;
+  return (
+    <>
+      <canvas ref={ref} className={className} aria-hidden />
+      <div
+        ref={readoutRef}
+        aria-hidden
+        className="vf-readout pointer-events-none absolute top-[4%] right-4 z-10 hidden text-right sm:right-8 md:block"
+      >
+        <div className="font-mono text-[11px] tracking-[0.14em] text-muted">BED S-04 · HEART RATE</div>
+        <div className="mt-1 flex items-baseline justify-end gap-2">
+          <span ref={hrRef} className="vf-hr font-display text-[64px] leading-none tnum">64</span>
+          <span className="font-mono text-[12px] text-muted">BPM</span>
+        </div>
+        <div className="mt-3 flex justify-end gap-2 font-mono text-[11px] tracking-[0.1em] uppercase">
+          <span className="vf-chip rounded-full px-2.5 py-1">AYU <span ref={ayuRef}>Stable</span></span>
+          <span className="rounded-full border border-line-2 px-2.5 py-1 text-muted">NEWS2 Low</span>
+        </div>
+      </div>
+    </>
+  );
 }
