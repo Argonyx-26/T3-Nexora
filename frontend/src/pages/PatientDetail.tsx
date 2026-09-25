@@ -312,6 +312,13 @@ function FactorRow({ f, offset, total, i }: { f: Factor; offset: number; total: 
   );
 }
 
+/** "+1.2", "−0.4", or "0.0" — never a signed zero. */
+function fmtSlope(v: number) {
+  const r = Math.round(v * 10) / 10;
+  if (r === 0) return "0.0";
+  return `${r > 0 ? "+" : "−"}${Math.abs(r).toFixed(1)}`;
+}
+
 function VitalPanel({ vital, risk, loading, error, children }: { vital: VitalKey; risk?: Risk; loading: boolean; error?: Error; children: React.ReactNode }) {
   const meta = VITALS[vital];
   const dev = risk?.deviations[vital];
@@ -329,8 +336,8 @@ function VitalPanel({ vital, risk, loading, error, children }: { vital: VitalKey
           </div>
         </div>
         <div className="text-right font-mono text-[11px] leading-relaxed text-muted tnum">
-          {b && <div>normal {fmtVital(vital, b.low)}–{fmtVital(vital, b.high)}</div>}
-          {trend && <div className={cx(trend.flagged && "text-watch")}>{trend.slope_per_hr >= 0 ? "+" : "−"}{Math.abs(trend.slope_per_hr).toFixed(1)}/hr</div>}
+          {b && <div>normal {fmtVital(vital, b.low)}–{fmtVital(vital, vital === "spo2" ? Math.min(100, b.high) : b.high)}</div>}
+          {trend && <div className={cx(trend.flagged && "text-watch")}>{fmtSlope(trend.slope_per_hr)}/hr</div>}
         </div>
       </div>
       <div className="mt-3">

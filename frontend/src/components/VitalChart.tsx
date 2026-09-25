@@ -40,6 +40,15 @@ export function VitalChart({ vital, data, baseline, spo2Scale = 1, second, heigh
   hi += pad;
   if (vital === "spo2") hi = Math.min(hi, 100.5);
   const lines = news2Lines(vital, spo2Scale).filter((l) => l.v > lo && l.v < hi);
+  // Label a threshold only if it sits clear of the last labelled one, so labels never stack.
+  let lastLabelled = -Infinity;
+  const labelled = new Set<number>();
+  for (const l of [...lines].sort((a, b) => a.v - b.v)) {
+    if (Math.abs(l.v - lastLabelled) >= (hi - lo) * 0.12) {
+      labelled.add(l.v);
+      lastLabelled = l.v;
+    }
+  }
   const rows = data.map((d) => ({ t: d.ts, a: d[vital], b: second ? d[second.key] : undefined }));
 
   return (
@@ -54,7 +63,7 @@ export function VitalChart({ vital, data, baseline, spo2Scale = 1, second, heigh
             y={l.v}
             stroke="var(--line-2)"
             strokeDasharray="3 4"
-            label={{ value: `NEWS2 ${l.label}`, position: "insideTopRight", fontSize: 9, fill: "var(--faint)", fontFamily: "var(--font-mono)" }}
+            label={labelled.has(l.v) ? { value: `NEWS2 ${l.label}`, position: "insideTopRight", fontSize: 9, fill: "var(--faint)", fontFamily: "var(--font-mono)" } : undefined}
           />
         ))}
         <XAxis dataKey="t" tickFormatter={fmtTime} tick={{ fontSize: 10, fill: "var(--muted)", fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} minTickGap={48} />
