@@ -239,7 +239,9 @@ def assess(ctx: PatientContext) -> RiskResult:
     if n2.band in ("Medium", "High"):
         actions.append(f"NEWS2 guidance: {n2.response}")
 
-    summary = " · ".join(f.headline for f in factors[:2]) if factors else "Within this patient's normal range"
+    # Name the causes, not the rule that lifted the score to its floor.
+    causes = [f for f in factors if f.kind != "escalation"] or factors
+    summary = " · ".join(f.headline for f in causes[:2]) if causes else "Within this patient's normal range"
 
     return RiskResult(
         score=score, level=level, urgency=W.URGENCY[level], recommended_action=actions, summary=summary,

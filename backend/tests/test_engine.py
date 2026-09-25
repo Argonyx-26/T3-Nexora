@@ -76,6 +76,15 @@ def test_news2_high_forces_critical():
     assert total(r) == pytest.approx(r.score, abs=1.0)
 
 
+def test_summary_names_causes_not_the_escalation_rule():
+    h = history(24)
+    h.append(reading(ts=T0 + timedelta(minutes=5), sbp=85))  # SBP alone scores 3
+    r = assess(ctx(h))
+    assert any(f.kind == "escalation" for f in r.factors)
+    assert "Escalation rule" not in r.summary
+    assert "NEWS2" in r.summary
+
+
 def test_red_flag_symptom_escalates_to_critical():
     r = assess(ctx(history(7 * 24), symptoms=[SymptomEntry(T0 - timedelta(minutes=10), "chest_pain")]))
     assert r.level == "Critical"
