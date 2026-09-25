@@ -1,15 +1,18 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { forwardRef, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Shell, SyncStatus } from "../components/Shell";
+import { AlertToaster, AlertsPanel, LiveStatus } from "../components/alerts";
+import { Shell } from "../components/Shell";
 import { Sparkline } from "../components/Sparkline";
 import { spotlight } from "../components/motion";
-import { Card, EmptyState, ErrorState, Eyebrow, LevelDot, RiskBadge, Skeleton, cx } from "../components/ui";
+import { EmptyState, ErrorState, Eyebrow, LevelDot, RiskBadge, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
+import { useLive } from "../lib/live";
 import { LEVELS, LEVEL_STYLE, fmtVital } from "../lib/format";
 import type { Level, PatientSummary, Vital, VitalKey } from "../lib/types";
 
-const POLL_MS = 10_000;
+const RANK: Record<Level, number> = { Stable: 0, Watch: 1, Warning: 2, Critical: 3 };
+const POLL_MS = 30_000; // static details; live values come over the WebSocket
 const SPARK: { key: VitalKey; label: string }[] = [
   { key: "hr", label: "HR" },
   { key: "spo2", label: "SpO₂" },
@@ -41,15 +44,36 @@ export default function Doctor() {
   const [filter, setFilter] = useState<Level | "All">("All");
   const [q, setQ] = useState("");
 
-  const list = patients.data ?? [];
+  const live = useLive();
+  // Static details from REST, live risk and vitals from the stream, highest score first.
+  const list = useMemo(() => {
+    const base = patients.data ?? [];
+    return base
+      .map((p) => {
+        const u = live.patients[p.id];
+        return u ? { ...p, risk: u.risk, latest: u.vitals } : p;
+      })
+      // Risky patients by score; Stable ones hold their bed order so tiny score jitter can't reshuffle the ward.
+      .sort((a, b) => {
+        const ka = RANK[a.risk.level] * 1000 + (a.risk.level === "Stable" ? 0 : a.risk.score);
+        const kb = RANK[b.risk.level] * 1000 + (b.risk.level === "Stable" ? 0 : b.risk.score);
+        return kb - ka || a.bed.localeCompare(b.bed);
+      });
+  }, [patients.data, live.patients]);
+  const series = (id: string) => {
+    const rest = vitals.data?.[id];
+    if (!rest) return undefined;
+    const lastTs = rest.length ? rest[rest.length - 1].ts : "";
+    return [...rest, ...(live.trail[id] ?? []).filter((v) => v.ts > lastTs)].slice(-36);
+  };
   const counts = useMemo(() => Object.fromEntries(LEVELS.map((l) => [l, list.filter((p) => p.risk.level === l).length])) as Record<Level, number>, [list]);
   const shown = list.filter(
     (p) => (filter === "All" || p.risk.level === filter) && (!q || `${p.name} ${p.bed} ${p.conditions.join(" ")}`.toLowerCase().includes(q.toLowerCase())),
   );
-  const attention = list.filter((p) => p.risk.level !== "Stable");
 
   return (
-    <Shell status={<SyncStatus at={patients.refreshedAt} error={patients.error} />}>
+    <Shell status={<LiveStatus />}>
+      <AlertToaster />
       <div className="mx-auto max-w-[1400px] px-4 pt-10 pb-20 sm:px-8">
         {/* Heading */}
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -73,7 +97,7 @@ export default function Doctor() {
             <Kpi label="Patients" value={list.length} loading={!patients.data} />
             <Kpi label="Critical" value={counts.Critical ?? 0} level="Critical" loading={!patients.data} />
             <Kpi label="Warning" value={counts.Warning ?? 0} level="Warning" loading={!patients.data} />
-            <Kpi label="Watch" value={counts.Watch ?? 0} level="Watch" loading={!patients.data} />
+            <Kpi label="Open alerts" value={live.alerts.length} level={live.alerts.some((a) => a.status === "new") ? "Critical" : undefined} loading={!patients.data} />
           </div>
         </div>
 
@@ -126,7 +150,7 @@ export default function Doctor() {
                 <motion.div layout className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                   <AnimatePresence mode="popLayout">
                     {shown.map((p, i) => (
-                      <PatientCard key={p.id} p={p} vitals={vitals.data?.[p.id]} index={i} />
+                      <PatientCard key={p.id} p={p} vitals={series(p.id)} index={i} />
                     ))}
                   </AnimatePresence>
                 </motion.div>
@@ -134,40 +158,9 @@ export default function Doctor() {
             )}
           </div>
 
-          {/* Attention queue */}
-          <aside className="xl:sticky xl:top-24 xl:self-start">
-            <Card className="p-5">
-              <div className="flex items-baseline justify-between">
-                <h2 className="font-display text-[26px] leading-none">Attention</h2>
-                <span className="font-mono text-[12px] text-muted tnum">{attention.length} open</span>
-              </div>
-              <p className="mt-2 text-[12px] leading-relaxed text-muted">Patients above Stable, highest risk first.</p>
-              <div className="mt-5 space-y-2">
-                {!patients.data ? (
-                  Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16" />)
-                ) : attention.length === 0 ? (
-                  <EmptyState title="All quiet">Nobody is above Stable. Anyone who rises will appear here first.</EmptyState>
-                ) : (
-                  <AnimatePresence initial={false}>
-                    {attention.map((p) => (
-                      <motion.div key={p.id} layout initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
-                        <Link
-                          to={`/patients/${p.id}`}
-                          className={cx("block rounded-2xl border-l-2 px-4 py-3 transition-colors hover:bg-surface-2", LEVEL_STYLE[p.risk.level].border)}
-                          style={{ borderLeftColor: LEVEL_STYLE[p.risk.level].hex }}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="truncate text-[14px] font-medium">{p.name}</span>
-                            <span className={cx("font-mono text-[13px] tnum", LEVEL_STYLE[p.risk.level].text)}>{p.risk.score}</span>
-                          </div>
-                          <div className="mt-0.5 truncate text-[12px] text-muted">{p.risk.summary}</div>
-                        </Link>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                )}
-              </div>
-            </Card>
+          {/* Alerts */}
+          <aside className="xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:self-start xl:overflow-y-auto">
+            <AlertsPanel />
           </aside>
         </div>
       </div>
@@ -215,6 +208,15 @@ const PatientCard = forwardRef<HTMLDivElement, { p: PatientSummary; vitals?: Vit
         )}
       >
         <span className={cx("absolute inset-x-0 top-0 h-[3px]", s.dot, p.risk.level === "Stable" && "opacity-0")} />
+        {/* a brief wash of the new level's colour whenever the level changes */}
+        <motion.span
+          key={p.risk.level}
+          aria-hidden
+          className={cx("pointer-events-none absolute inset-0 -z-10", s.soft)}
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 1.6, ease: "easeOut" }}
+        />
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="truncate text-[16px] font-medium">{p.name}</div>
