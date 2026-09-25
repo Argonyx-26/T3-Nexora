@@ -488,7 +488,7 @@ function BigFooter() {
         </div>
         <div className="flex flex-col gap-2 border-t border-line py-6 font-mono text-[11px] tracking-wide text-muted sm:flex-row sm:justify-between">
           <span>Team AYU · Ishan Sharma · Aryan Verma · Harshit Kandpal · Vinay</span>
-          <span>Argonyx'26 · RV College</span>
+          <span>Argonyx'26 · RV University</span>
         </div>
       </div>
     </footer>
