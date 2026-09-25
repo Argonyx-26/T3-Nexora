@@ -174,6 +174,37 @@ export interface SymptomLog {
   source: string;
   note: string;
   resolved_at: string | null;
+  severity: "" | "mild" | "moderate" | "severe";
+  duration: "" | "today" | "days" | "week";
+  frequency: "" | "once" | "on_off" | "constant";
+}
+
+export interface Checkin {
+  id: number;
+  ts: string;
+  mood: number;
+  energy: number;
+  sleep: number;
+  note: string;
+  source: string;
+}
+
+export interface TimelineEvent {
+  ts: string;
+  kind: "status" | "symptom" | "dose" | "reading" | "alert" | "checkin";
+  sub: string;
+  level: Level | null;
+  prev_level: string | null;
+  symptom: string | null;
+  label_en: string | null;
+  label_hi: string | null;
+  severity: string;
+  medicine: string | null;
+  values: Record<string, number>;
+  source: string;
+  note: string;
+  by: string;
+  mood: number | null;
 }
 
 export interface Explanation {

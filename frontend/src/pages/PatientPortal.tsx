@@ -2,13 +2,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Shell } from "../components/Shell";
-import { ClipboardList, HandHeart, Languages, NotebookPen, Send, TriangleAlert, UserRound } from "lucide-react";
+import { HandHeart, Languages, NotebookPen, UserRound } from "lucide-react";
 import { VITAL_ICON, ic } from "../components/icons";
 import { PatientArt } from "../components/Illustrations";
 import { AdherenceTracker, AssistantChat, DailyCard, HealthSummary, Overview, Prescriptions, PulseOxTracker, WeatherCard } from "../components/PatientDashboard";
+import { CareTeam, DailyCheckin, HealthTimeline, SmartAlerts, SymptomTracker } from "../components/PatientCare";
 import { ErrorState, Eyebrow, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
-import { DISCLAIMER, RED_FLAG_SYMPTOMS, SYMPTOM_LABEL, initials } from "../lib/format";
+import { DISCLAIMER, initials } from "../lib/format";
 import { useLive } from "../lib/live";
 import type { Level, VitalKey, VitalsInput } from "../lib/types";
 
@@ -70,7 +71,6 @@ const FIELDS: { key: FieldKey; label: (t: (typeof T)["en"]) => string; unit: str
   { key: "glucose", label: (t) => t.glucose, unit: "mg/dL", min: 20, max: 600, step: "1" },
 ];
 
-const SYMPTOM_ORDER = Object.keys(SYMPTOM_LABEL).sort((a, b) => Number(RED_FLAG_SYMPTOMS.has(b)) - Number(RED_FLAG_SYMPTOMS.has(a)));
 
 // Friendly, varied avatar colours for the name list (decorative accents only, never risk colours).
 const AVATAR = ["bg-teal-soft text-teal", "bg-violet-soft text-violet", "bg-sky-soft text-sky", "bg-pink-soft text-pink"];
@@ -130,6 +130,7 @@ export function PatientHome() {
   const tick = live.patients[id]?.vitals.ts;
   const lastFast = useRef(0);
   const lastSlow = useRef(0);
+  const [version, setVersion] = useState(0); // bumps the timeline
   useEffect(() => {
     if (!tick) return;
     const now = Date.now();
@@ -143,6 +144,7 @@ export function PatientHome() {
       vitals.reload();
       meds.reload();
       symptoms.reload();
+      setVersion((v) => v + 1);
     }
   }, [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const refreshAll = () => {
@@ -151,6 +153,7 @@ export function PatientHome() {
     vitals.reload();
     meds.reload();
     symptoms.reload();
+    setVersion((v) => v + 1);
   };
   const level = p?.risk.level;
   const bucket = p ? Math.floor(p.risk.score / 5) : -1;
@@ -221,6 +224,21 @@ export function PatientHome() {
           )}
         </div>
 
+        {/* 14 · Daily check-in */}
+        {p && (
+          <div className="mt-4">
+            <DailyCheckin patientId={id} lang={l} now={p.latest.ts} source={source} onSaved={refreshAll} />
+          </div>
+        )}
+
+        {/* 12 · Smart alerts + 13 · Care team */}
+        {p && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+            <SmartAlerts patientId={id} lang={l} risk={risk.data} />
+            <CareTeam patientId={id} lang={l} ward={p.ward} bed={p.bed} />
+          </div>
+        )}
+
         {/* 4 · Overall health */}
         {p && (
           <div className="mt-10">
@@ -246,10 +264,21 @@ export function PatientHome() {
           <PulseOxTracker patientId={id} vitals={vitals.data} source={source} lang={l} onSaved={refreshAll} />
         </div>
 
-        <div className="grid gap-x-4 lg:grid-cols-2">
-          {p && <LogReading patientId={id} source={source} t={t} onSaved={refreshAll} />}
-          {p && <SymptomChecklist patientId={id} source={source} lang={l} t={t} onSent={refreshAll} />}
-        </div>
+        {/* 10 · Symptom tracker */}
+        {p && (
+          <div className="mt-4">
+            <SymptomTracker patientId={id} lang={l} source={source} log={symptoms.data} now={p.latest.ts} onSent={refreshAll} />
+          </div>
+        )}
+
+        {p && <LogReading patientId={id} source={source} t={t} onSaved={refreshAll} />}
+
+        {/* 9 · Personal health timeline */}
+        {p && (
+          <div className="mt-10">
+            <HealthTimeline patientId={id} lang={l} now={p.latest.ts} version={version} />
+          </div>
+        )}
 
         <section className="mt-10 flex flex-col items-center gap-4 rounded-3xl border border-dashed border-line-2 p-6 sm:flex-row sm:gap-6">
           <PatientArt className="w-44 shrink-0" />
@@ -344,79 +373,3 @@ function LogReading({ patientId, source, t, onSaved }: { patientId: string; sour
   );
 }
 
-function SymptomChecklist({ patientId, source, lang, t, onSent }: { patientId: string; source: "patient" | "asha"; lang: Lang; t: Texts; onSent: () => void }) {
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [state, setState] = useState<{ kind: "idle" | "busy" | "ok" | "error"; msg?: string; redFlag?: boolean }>({ kind: "idle" });
-
-  const toggle = (k: string) => {
-    setPicked((s) => {
-      const n = new Set(s);
-      if (n.has(k)) n.delete(k);
-      else n.add(k);
-      return n;
-    });
-    if (state.kind !== "busy") setState({ kind: "idle" });
-  };
-
-  const send = async () => {
-    if (picked.size === 0) {
-      setState({ kind: "error", msg: t.pickOne });
-      return;
-    }
-    setState({ kind: "busy" });
-    try {
-      const list = [...picked];
-      await api.reportSymptoms(patientId, list, source);
-      setPicked(new Set());
-      setState({ kind: "ok", msg: t.sent, redFlag: list.some((k) => RED_FLAG_SYMPTOMS.has(k)) });
-      onSent();
-    } catch (err) {
-      setState({ kind: "error", msg: (err as Error).message });
-    }
-  };
-
-  const redPicked = [...picked].some((k) => RED_FLAG_SYMPTOMS.has(k));
-
-  return (
-    <section className="mt-10">
-      <Eyebrow icon={ClipboardList}>{t.feel}</Eyebrow>
-      <div className="mt-4 rounded-3xl border border-line bg-surface p-5">
-        <p className="text-[13px] text-muted">{t.feelHint}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {SYMPTOM_ORDER.map((k) => {
-            const on = picked.has(k);
-            const red = RED_FLAG_SYMPTOMS.has(k);
-            return (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggle(k)}
-                className={cx(
-                  "inline-flex h-10 items-center gap-2 rounded-full border px-4 text-[14px] transition-colors",
-                  on ? (red ? "border-critical bg-critical-soft text-critical" : "border-teal bg-teal-soft text-teal") : "border-line hover:border-line-2",
-                )}
-              >
-                {red && <span className="size-1.5 rounded-full bg-critical" aria-hidden />}
-                {SYMPTOM_LABEL[k][lang]}
-              </button>
-            );
-          })}
-        </div>
-        {(redPicked || state.redFlag) && (
-          <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-critical-soft px-4 py-3 text-[14px] font-medium text-critical" role="alert">
-            <TriangleAlert {...ic(18)} className="mt-px shrink-0" />
-            {t.redflag}
-          </div>
-        )}
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={send} disabled={state.kind === "busy"} className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-6 text-[14px] font-medium text-bg transition-colors hover:bg-teal disabled:opacity-60">
-            <Send {...ic(15)} />
-            {state.kind === "busy" ? t.saving : t.send}
-          </button>
-          {state.msg && <span className={cx("text-[13px]", state.kind === "error" ? "text-critical" : "text-stable")} role="status">{state.msg}</span>}
-        </div>
-      </div>
-    </section>
-  );
-}

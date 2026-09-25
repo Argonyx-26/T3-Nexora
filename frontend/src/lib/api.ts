@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AlertItem, ChatReply, ChatTurn, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
+import type { AlertItem, ChatReply, ChatTurn, Checkin, TimelineEvent, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "http://127.0.0.1:8000";
 
@@ -41,7 +41,15 @@ export const api = {
   alerts: (status = "open", s?: AbortSignal) => get<AlertItem[]>(`/alerts?status=${status}`, s),
   ack: (id: number, note: string, by = "Doctor") => post<AlertItem>(`/alerts/${id}/ack`, { note, by }),
   resolve: (id: number, note = "", by = "Doctor") => post<AlertItem>(`/alerts/${id}/resolve`, { note, by }),
-  reportSymptoms: (id: string, symptoms: string[], source: ReadingSource = "patient", note = "") => post<Risk>(`/patients/${id}/symptoms`, { symptoms, source, note }),
+  reportSymptoms: (
+    id: string, symptoms: string[], source: ReadingSource = "patient", note = "",
+    details: { severity?: string; duration?: string; frequency?: string } = {},
+  ) => post<Risk>(`/patients/${id}/symptoms`, { symptoms, source, note, ...details }),
+  checkins: (id: string, s?: AbortSignal) => get<Checkin[]>(`/patients/${id}/checkins`, s),
+  addCheckin: (id: string, body: { mood: number; energy: number; sleep: number; note?: string; symptoms?: string[]; source?: ReadingSource }) =>
+    post<Checkin>(`/patients/${id}/checkins`, body),
+  timeline: (id: string, hours = 48, s?: AbortSignal) => get<TimelineEvent[]>(`/patients/${id}/timeline?hours=${hours}`, s),
+  patientAlerts: (id: string, s?: AbortSignal) => get<AlertItem[]>(`/alerts?status=all&patient_id=${id}&limit=20`, s),
   recordDose: (doseId: number, status: "taken" | "missed") => post<Risk>("/doses", { dose_id: doseId, status }),
   explanation: (id: string, lang: "en" | "hi", s?: AbortSignal) => get<Explanation>(`/patients/${id}/explanation?lang=${lang}`, s),
   chat: (id: string, message: string, lang: "en" | "hi", history: ChatTurn[]) =>
