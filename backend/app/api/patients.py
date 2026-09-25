@@ -2,17 +2,29 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
 from ..db import get_session
-from ..models import DoseEvent, Medication, Patient, RiskSnapshot, VitalReading
-from ..risk import assess
+from ..models import DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
+from ..risk import weights as W
 from ..risk.adherence import effective_status
 from ..risk.types import Dose
-from ..schemas import DoseOut, MedicationOut, PatientOut, PatientSummary, RiskOut, RiskPointOut, VitalOut
-from ..services.context import load_context
+from ..schemas import (
+    DoseOut,
+    MedicationOut,
+    PatientSummary,
+    RiskOut,
+    RiskPointOut,
+    SymptomLogOut,
+    SymptomsIn,
+    VitalOut,
+)
+from ..services.hub import hub
 from ..services.serialize import risk_brief, risk_out
+from ..sim.simulator import sim
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
 
@@ -38,21 +50,27 @@ def latest_reading(s: Session, patient_id: str) -> VitalReading:
     ).one()
 
 
-@router.get("", response_model=list[PatientSummary], summary="All patients, highest risk first")
-def list_patients(s: Session = Depends(get_session)):
-    out = []
-    for p in s.exec(select(Patient)).all():
-        r = assess(load_context(s, p.id))
-        out.append(PatientSummary(**p.model_dump(), risk=risk_brief(r), latest=VitalOut(**latest_reading(s, p.id).model_dump())))
+def summary_of(patient_id: str) -> PatientSummary:
+    ps = sim.get(patient_id)
+    if ps is None:
+        raise HTTPException(404, f"No patient {patient_id}")
+    last = ps.history[-1]
+    latest = VitalOut(ts=last.ts, hr=last.hr, spo2=last.spo2, sbp=last.sbp, dbp=last.dbp, rr=last.rr, temp=last.temp,
+                      glucose=last.glucose, on_oxygen=last.on_oxygen, consciousness=last.consciousness, source="sim")
+    return PatientSummary(**ps.info, risk=risk_brief(ps.risk), latest=latest)
+
+
+@router.get("", response_model=list[PatientSummary], summary="All patients, highest risk first (live)")
+def list_patients():
+    sim.ensure_loaded()
+    out = [summary_of(pid) for pid in list(sim.states)]
     out.sort(key=lambda x: -x.risk.score)
     return out
 
 
-@router.get("/{patient_id}", response_model=PatientSummary, summary="One patient with current risk")
-def patient_detail(patient_id: str, s: Session = Depends(get_session)):
-    p = get_patient(s, patient_id)
-    r = assess(load_context(s, patient_id))
-    return PatientSummary(**p.model_dump(), risk=risk_brief(r), latest=VitalOut(**latest_reading(s, patient_id).model_dump()))
+@router.get("/{patient_id}", response_model=PatientSummary, summary="One patient with current risk (live)")
+def patient_detail(patient_id: str):
+    return summary_of(patient_id)
 
 
 @router.get("/{patient_id}/vitals", response_model=list[VitalOut], summary="Vitals history, oldest first")
@@ -75,10 +93,12 @@ def patient_vitals(
     return [VitalOut(**r.model_dump()) for r in rows]
 
 
-@router.get("/{patient_id}/risk", response_model=RiskOut, summary="Full explainable risk assessment")
-def patient_risk(patient_id: str, s: Session = Depends(get_session)):
-    get_patient(s, patient_id)
-    return risk_out(patient_id, assess(load_context(s, patient_id)))
+@router.get("/{patient_id}/risk", response_model=RiskOut, summary="Full explainable risk assessment (live)")
+def patient_risk(patient_id: str):
+    ps = sim.get(patient_id)
+    if ps is None:
+        raise HTTPException(404, f"No patient {patient_id}")
+    return risk_out(patient_id, ps.risk)
 
 
 @router.get("/{patient_id}/risk/history", response_model=list[RiskPointOut], summary="Risk score over time")
@@ -122,3 +142,35 @@ def patient_medications(patient_id: str, s: Session = Depends(get_session)):
             adherence_pct=round(100 * taken / counted, 1) if counted else None, doses=dose_out,
         ))
     return out
+
+
+@router.get("/{patient_id}/symptoms", response_model=list[SymptomLogOut], summary="Symptom log, newest first (7 days)")
+def symptom_log(patient_id: str, s: Session = Depends(get_session)):
+    get_patient(s, patient_id)
+    since = sim.now - timedelta(days=7)
+    rows = s.exec(
+        select(SymptomReport)
+        .where(SymptomReport.patient_id == patient_id, SymptomReport.ts >= since)
+        .order_by(col(SymptomReport.ts).desc())
+    ).all()
+    return [
+        SymptomLogOut(id=r.id, ts=r.ts, symptom=r.symptom, label_en=W.SYMPTOMS.get(r.symptom, {}).get("en", r.symptom),
+                      label_hi=W.SYMPTOMS.get(r.symptom, {}).get("hi", r.symptom),
+                      red_flag=W.SYMPTOMS.get(r.symptom, {}).get("escalate", False), source=r.source, note=r.note,
+                      resolved_at=r.resolved_at)
+        for r in rows
+    ]
+
+
+@router.post("/{patient_id}/symptoms", response_model=RiskOut, summary="Report symptoms; the patient is re-scored at once")
+async def report_symptoms(patient_id: str, body: SymptomsIn):
+    if sim.get(patient_id) is None:
+        raise HTTPException(404, f"No patient {patient_id}")
+    unknown = [k for k in body.symptoms if k not in W.SYMPTOMS]
+    if unknown or not body.symptoms:
+        raise HTTPException(422, f"Unknown or empty symptoms: {unknown or '[]'}. Known: {sorted(W.SYMPTOMS)}")
+    if body.source not in ("patient", "asha", "staff"):
+        raise HTTPException(422, "source must be patient, asha or staff")
+    message = await asyncio.to_thread(sim.report_symptoms, patient_id, list(dict.fromkeys(body.symptoms)), body.source, body.note[:500])
+    await hub.broadcast(message)
+    return risk_out(patient_id, sim.get(patient_id).risk)
