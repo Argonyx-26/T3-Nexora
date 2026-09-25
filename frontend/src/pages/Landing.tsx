@@ -461,7 +461,7 @@ function RoleCard({ to, who, line, meta, art, icon: Icon }: { to: string; who: s
         className="spotlight group relative flex min-h-[420px] flex-col justify-between overflow-hidden rounded-[32px] border border-line bg-surface p-8 transition-all duration-500 hover:border-line-2 sm:p-11"
       >
         <div className="flex items-start justify-between gap-6">
-          <span className="eyebrow flex items-center gap-2"><Icon size={14} strokeWidth={1.75} aria-hidden />{meta}</span>
+          <span className="eyebrow flex items-center gap-2 whitespace-nowrap"><Icon size={14} strokeWidth={1.75} aria-hidden />{meta}</span>
           <div className="transition-transform duration-700 group-hover:scale-105">{art}</div>
         </div>
         <div>
