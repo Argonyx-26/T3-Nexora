@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useMotionValueEvent, useScroll, useTransform }
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { HeroMonitor } from "../components/HeroMonitor";
+import { HospitalStory } from "../components/HospitalStory";
 import { ArtBaseline, ArtBreath, ArtNews2, ArtTrend, ArtWard, CountUp, LiveTicker, Pulse, spotlight } from "../components/motion";
 import { ThemeToggle, Wordmark } from "../components/Shell";
 import { api, useQuery } from "../lib/api";
@@ -51,6 +52,7 @@ export default function Landing() {
       <TopBar />
       <Hero />
       <LiveTicker />
+      <HospitalStory />
       <ScrollStory />
       <Stats />
       <Lenses />
