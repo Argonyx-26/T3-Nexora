@@ -9,13 +9,16 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
-from ..db import get_session
+from ..db import engine, get_session
 from ..models import DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
 from ..risk import weights as W
 from ..risk.adherence import effective_status
 from ..risk.types import Dose
+from ..explain.assistant import HealthFacts, assistant
 from ..explain.service import explainer
 from ..schemas import (
+    ChatIn,
+    ChatOut,
     DoseOut,
     ExplanationOut,
     MedicationOut,
@@ -29,6 +32,7 @@ from ..schemas import (
 )
 from ..services.hub import hub
 from ..services.serialize import risk_brief, risk_out
+from ..seed.physiology import IST
 from ..sim.simulator import sim
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
@@ -203,3 +207,52 @@ async def log_vitals(patient_id: str, body: VitalsIn):
     message = await asyncio.to_thread(sim.add_manual_reading, patient_id, values, body.source)
     await hub.broadcast(message)
     return risk_out(patient_id, sim.get(patient_id).risk)
+
+
+VITAL_UNITS = {"hr": "bpm", "spo2": "%", "temp": "°C", "glucose": "mg/dL"}
+
+
+def health_facts(patient_id: str) -> HealthFacts:
+    """The assistant's view of one patient: health facts only, no name, ID, bed or age."""
+    ps = sim.get(patient_id)
+    risk = ps.risk
+    last = ps.history[-1]
+
+    def normal(v: str, decimals: int = 0) -> str | None:
+        b = risk.baselines.get(v)
+        if not b:
+            return None
+        lo, hi = b.mean - 2 * b.std, b.mean + 2 * b.std
+        return f"{lo:.{decimals}f}–{hi:.{decimals}f}"
+
+    readings = {v: {"value": round(getattr(last, v), 1 if v == "temp" else 0), "unit": VITAL_UNITS[v], "normal": normal(v, 1 if v == "temp" else 0)}
+                for v in ("hr", "spo2", "temp", "glucose") if getattr(last, v) is not None}
+    readings = {k: {**r, "value": int(r["value"]) if k != "temp" else r["value"]} for k, r in readings.items()}
+    readings["bp"] = {"value": f"{round(last.sbp)}/{round(last.dbp)}", "unit": "mmHg", "normal": None}
+    with Session(engine) as s:
+        meds = s.exec(select(Medication).where(Medication.patient_id == patient_id)).all()
+    upcoming = sorted((d for d in ps.doses if d.status == "pending" and d.scheduled_at >= sim.now), key=lambda d: d.scheduled_at)
+    nxt = upcoming[0] if upcoming else None
+    labels = [W.SYMPTOMS.get(r.key, {}).get("en", r.key) for r in sorted(ps.symptoms, key=lambda r: r.ts, reverse=True)
+              if r.ts >= sim.now - timedelta(days=7)]
+    return HealthFacts(
+        level=risk.level, score=risk.score, urgency=risk.urgency,
+        factors=[f.message for f in risk.factors if f.contribution > 0][:4],
+        conditions=list(ps.info.get("conditions", [])),
+        readings=readings,
+        medicines=[{"name": m.name, "dose": m.dose, "purpose": m.purpose, "times": m.times, "critical": m.critical} for m in meds],
+        next_dose={"name": nxt.medication, "time": (nxt.scheduled_at + IST).strftime("%H:%M")} if nxt else None,
+        adherence_pct=risk.adherence.pct,
+        symptoms=list(dict.fromkeys(labels)),
+    )
+
+
+@router.post("/{patient_id}/chat", response_model=ChatOut,
+             summary="Ask AYU's health assistant about your own readings, medicines and symptoms")
+async def chat(patient_id: str, body: ChatIn):
+    if sim.get(patient_id) is None:
+        raise HTTPException(404, f"No patient {patient_id}")
+    facts = await asyncio.to_thread(health_facts, patient_id)
+    facts.history = [t.model_dump() for t in body.history]
+    out = await assistant.reply(facts, body.message, body.lang)
+    return ChatOut(**out, disclaimer=W.DISCLAIMER)

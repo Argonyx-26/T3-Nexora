@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, PlainSerializer
 
@@ -244,6 +244,25 @@ class SymptomLogOut(BaseModel):
 
 
 # --- Phase 4: explanations, manual readings ------------------------------------------
+
+
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str = Field(max_length=1000)
+
+
+class ChatIn(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+    lang: Literal["en", "hi"] = "en"
+    history: list[ChatTurn] = Field(default_factory=list, max_length=12)
+
+
+class ChatOut(BaseModel):
+    reply: str
+    urgent: bool  # a red flag was detected: the reply tells them to call a nurse / 108
+    source: str  # "safety" | "gemini" | "builtin"
+    model: str | None
+    disclaimer: str
 
 
 class ExplanationOut(BaseModel):
