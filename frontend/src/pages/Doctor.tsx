@@ -6,6 +6,7 @@ import { AlertToaster, AlertsPanel, LiveStatus } from "../components/alerts";
 import { Shell } from "../components/Shell";
 import { Sparkline } from "../components/Sparkline";
 import { spotlight } from "../components/motion";
+import { DoctorArt } from "../components/Illustrations";
 import { VITAL_ICON, ic } from "../components/icons";
 import { EmptyState, ErrorState, Eyebrow, LevelDot, RiskBadge, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
@@ -95,11 +96,14 @@ export default function Doctor() {
               <Skeleton className="mt-3 h-16 w-[420px] max-w-full" />
             )}
           </div>
+          <div className="flex items-end gap-4">
+          <DoctorArt className="-mb-3 hidden w-36 shrink-0 2xl:block" />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Kpi label="Patients" icon={Users} value={list.length} loading={!patients.data} />
             <Kpi label="Critical" icon={Siren} value={counts.Critical ?? 0} level="Critical" loading={!patients.data} />
             <Kpi label="Warning" icon={TriangleAlert} value={counts.Warning ?? 0} level="Warning" loading={!patients.data} />
             <Kpi label="Open alerts" icon={BellRing} value={live.alerts.length} level={live.alerts.some((a) => a.status === "new") ? "Critical" : undefined} loading={!patients.data} />
+          </div>
           </div>
         </div>
 

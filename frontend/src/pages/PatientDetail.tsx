@@ -6,6 +6,7 @@ import { Area, AreaChart, CartesianGrid, ReferenceArea, ResponsiveContainer, Too
 import { AlertCard, AlertToaster, LiveStatus } from "../components/alerts";
 import { ExplanationCard } from "../components/ExplanationCard";
 import { VITAL_ICON, ic } from "../components/icons";
+import { BeatingHeart, PulseStrip } from "../components/PageArt";
 import { Shell } from "../components/Shell";
 import { VitalChart } from "../components/VitalChart";
 import { Card, EmptyState, ErrorState, Eyebrow, RiskBadge, Skeleton, cx } from "../components/ui";
@@ -81,6 +82,7 @@ export default function PatientDetail() {
   const p = patient.data;
   const r = risk.data;
   const level: Level = r?.level ?? "Stable";
+  const hr = live.patients[id]?.vitals.hr ?? p?.latest.hr;
 
   return (
     <Shell status={<LiveStatus />}>
@@ -90,8 +92,9 @@ export default function PatientDetail() {
           <span className="transition-transform group-hover:-translate-x-0.5">←</span> Ward
         </Link>
 
-        {/* Header */}
-        <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+        {/* Header, over a slow ECG strip in the patient's level colour, at their heart rate */}
+        <div className="relative mt-6 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+          <PulseStrip bpm={hr} color={LEVEL_STYLE[level].hex} className="absolute inset-x-0 -bottom-11 -z-10 h-10 w-full opacity-30" />
           <div>
             {p ? (
               <>
@@ -119,7 +122,15 @@ export default function PatientDetail() {
                 </motion.div>
               </div>
               <div className="space-y-2 pb-1">
-                <RiskBadge level={level} />
+                <div className="flex items-center gap-2">
+                  <RiskBadge level={level} />
+                  {hr != null && (
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[12px] text-ink-2 tnum" title="Beating at the patient's live heart rate">
+                      <BeatingHeart bpm={hr} size={18} />
+                      {Math.round(hr)}
+                    </span>
+                  )}
+                </div>
                 <div className="font-mono text-[12px] text-muted tnum">NEWS2 {r.news2.total} · {r.news2.band}</div>
                 <div className="font-mono text-[12px] text-muted tnum">qSOFA {r.qsofa.score}/3</div>
               </div>

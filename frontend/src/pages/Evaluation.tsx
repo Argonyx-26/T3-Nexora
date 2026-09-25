@@ -3,6 +3,7 @@ import { BellOff, ChartColumn, FlaskConical, Footprints, Moon, ScrollText, Shiel
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CountUp } from "../components/motion";
+import { RaceArt } from "../components/PageArt";
 import { Shell } from "../components/Shell";
 import { Card, ErrorState, Eyebrow, Reveal, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
@@ -28,15 +29,25 @@ export default function Evaluation() {
   return (
     <Shell>
       <div className="mx-auto max-w-[1400px] px-4 pt-10 pb-24 sm:px-8">
-        <Eyebrow icon={FlaskConical}>Evaluation · AYU vs threshold-only NEWS2</Eyebrow>
-        <h1 className="mt-3 font-display text-[clamp(48px,7vw,112px)] leading-[0.9]">
-          The <span className="accent text-shine">proof.</span>
-        </h1>
-        <p className="mt-5 max-w-2xl text-[17px] leading-relaxed text-ink-2">
-          Every deterioration scenario, run on the patients it suits, over several random seeds. Each reading is scored by
-          NEWS2 alone and by AYU; we note when each first escalates. The same patients are also run at rest, to count
-          alarms raised for no reason.
-        </p>
+        <div className="grid items-end gap-8 lg:grid-cols-[1fr_440px]">
+          <div>
+            <Eyebrow icon={FlaskConical}>Evaluation · AYU vs threshold-only NEWS2</Eyebrow>
+            <h1 className="mt-3 font-display text-[clamp(48px,7vw,112px)] leading-[0.9]">
+              The <span className="accent text-shine">proof.</span>
+            </h1>
+            <p className="mt-5 max-w-2xl text-[17px] leading-relaxed text-ink-2">
+              Every deterioration scenario, run on the patients it suits, over several random seeds. Each reading is scored by
+              NEWS2 alone and by AYU; we note when each first escalates. The same patients are also run at rest, to count
+              alarms raised for no reason.
+            </p>
+          </div>
+          {r?.summary.urgent.lead_h_median != null && (
+            <div className="rounded-3xl border border-line bg-surface/70 p-4 backdrop-blur">
+              <div className="eyebrow px-2 pt-1">The race to urgent review · median</div>
+              <RaceArt minutes={Math.round(r.summary.urgent.lead_h_median * 60)} className="mt-2 w-full" />
+            </div>
+          )}
+        </div>
 
         {q.error && !r ? (
           <div className="mt-10"><ErrorState error={q.error} onRetry={q.reload} /></div>

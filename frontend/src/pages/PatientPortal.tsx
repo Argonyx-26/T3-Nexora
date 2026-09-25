@@ -5,6 +5,7 @@ import { Shell } from "../components/Shell";
 import { Check, ClipboardList, Clock, HandHeart, Languages, NotebookPen, Pill, Send, TriangleAlert, UserRound } from "lucide-react";
 import { LEVEL_ICON, VITAL_ICON, ic } from "../components/icons";
 import { PatientArt } from "../components/Illustrations";
+import { BeatingHeart, PillsArt } from "../components/PageArt";
 import { Card, EmptyState, ErrorState, Eyebrow, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
 import { DISCLAIMER, LEVEL_STYLE, RED_FLAG_SYMPTOMS, SYMPTOM_LABEL, fmtTime, fmtVital, initials, istDateKey } from "../lib/format";
@@ -205,7 +206,10 @@ export function PatientHome() {
               ] as const).map(([key, label, value, unit]) => (
                 <Card key={label} className="px-4 py-4">
                   <div className="flex items-center gap-1.5 text-[12px] text-muted"><VitalIcon k={key} />{label}</div>
-                  <div className="mt-1 font-mono text-[24px] leading-none tnum">{value}<span className="ml-1 text-[11px] text-muted">{unit}</span></div>
+                  <div className="mt-1 flex items-center gap-2 font-mono text-[24px] leading-none tnum">
+                    {value}<span className="-ml-1 text-[11px] text-muted">{unit}</span>
+                    {key === "hr" && <BeatingHeart bpm={p.latest.hr} size={16} className="ml-auto" />}
+                  </div>
                 </Card>
               ))}
             </div>
@@ -213,7 +217,10 @@ export function PatientHome() {
         )}
 
         <section className="mt-10">
-          <Eyebrow icon={Pill}>{t.meds}</Eyebrow>
+          <div className="flex items-end justify-between gap-4">
+            <Eyebrow icon={Pill}>{t.meds}</Eyebrow>
+            <PillsArt className="-mb-1 w-20" />
+          </div>
           <div className="mt-4">
             {meds.error && !meds.data ? <ErrorState error={meds.error} onRetry={meds.reload} /> : !todays ? <Skeleton className="h-32" /> : todays.length === 0 ? (
               <EmptyState title={t.none} />
@@ -232,9 +239,12 @@ export function PatientHome() {
         {p && <LogReading patientId={id} source={source} t={t} onSaved={() => patient.reload()} />}
         {p && <SymptomChecklist patientId={id} source={source} lang={l} t={t} onSent={() => patient.reload()} />}
 
-        <section className="mt-10 rounded-3xl border border-dashed border-line-2 p-6">
-          <div className="eyebrow flex items-center gap-2 text-teal"><HandHeart {...ic(14)} />{t.asha}</div>
-          <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{t.ashaBody}</p>
+        <section className="mt-10 flex flex-col items-center gap-4 rounded-3xl border border-dashed border-line-2 p-6 sm:flex-row sm:gap-6">
+          <PatientArt className="w-44 shrink-0" />
+          <div>
+            <div className="eyebrow flex items-center gap-2 text-teal"><HandHeart {...ic(14)} />{t.asha}</div>
+            <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{t.ashaBody}</p>
+          </div>
         </section>
         <p className="mt-8 text-[12px] leading-relaxed text-muted">{DISCLAIMER}</p>
       </div>

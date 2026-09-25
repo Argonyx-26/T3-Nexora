@@ -85,12 +85,14 @@ export function ErrorState({ error, onRetry }: { error: Error; onRetry?: () => v
   );
 }
 
-export function EmptyState({ title, children, icon: Icon = Inbox }: { title: string; children?: ReactNode; icon?: LucideIcon }) {
+export function EmptyState({ title, children, icon: Icon = Inbox, art }: { title: string; children?: ReactNode; icon?: LucideIcon; art?: ReactNode }) {
   return (
     <div className="rounded-2xl border border-dashed border-line-2 px-6 py-10 text-center">
-      <span className="mx-auto mb-3 grid size-11 place-items-center rounded-full bg-surface-2 text-muted">
-        <Icon size={20} strokeWidth={1.6} aria-hidden />
-      </span>
+      {art ?? (
+        <span className="mx-auto mb-3 grid size-11 place-items-center rounded-full bg-surface-2 text-muted">
+          <Icon size={20} strokeWidth={1.6} aria-hidden />
+        </span>
+      )}
       <div className="font-display text-2xl text-ink-2">{title}</div>
       {children && <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-muted">{children}</p>}
     </div>

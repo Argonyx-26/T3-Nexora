@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { BellRing, CircleCheck, Radio, Volume2, VolumeX } from "lucide-react";
+import { BellRing, Radio, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -7,6 +7,7 @@ import { DISCLAIMER, LEVEL_STYLE, fmtTime } from "../lib/format";
 import { onAlert, useLive } from "../lib/live";
 import type { AlertItem, Level } from "../lib/types";
 import { LEVEL_ICON, ic } from "./icons";
+import { ChaiArt } from "./PageArt";
 import { EmptyState, cx } from "./ui";
 
 /* ---------------- Sound (WebAudio, no asset files) ---------------- */
@@ -301,7 +302,7 @@ export function AlertsPanel() {
         {live.status !== "live" && !live.sim ? (
           <EmptyState title="Connecting…" icon={Radio}>Waiting for the live monitor.</EmptyState>
         ) : alerts.length === 0 ? (
-          <EmptyState title="All quiet" icon={CircleCheck}>No open alerts. Anyone whose level rises appears here first, with a sound.</EmptyState>
+          <EmptyState title="All quiet" art={<ChaiArt className="mx-auto mb-2 w-24" />}>No open alerts. Anyone whose level rises appears here first, with a sound.</EmptyState>
         ) : (
           <AnimatePresence initial={false}>
             {alerts.map((a) => (

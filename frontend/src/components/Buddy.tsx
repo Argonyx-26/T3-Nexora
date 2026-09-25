@@ -7,6 +7,7 @@ import {
   useSpring,
   useTransform,
   useVelocity,
+  type MotionValue,
 } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
@@ -148,7 +149,8 @@ export function Buddy() {
   );
 }
 
-function Character({ moving, wave, sway, reduce }: { moving: boolean; wave: number; sway: ReturnType<typeof useSpring>; reduce: boolean }) {
+/** Ayu himself, reusable on other screens: `wave` > 0 plays a wave, `moving` kicks his legs. */
+export function Character({ moving = false, wave = 0, sway, reduce = false }: { moving?: boolean; wave?: number; sway?: MotionValue<number>; reduce?: boolean }) {
   const loop = (duration: number) => ({ duration, repeat: Infinity, ease: "easeInOut" as const });
   const skin = "#c98d62";
   const skinShade = "#b27650";
@@ -157,7 +159,7 @@ function Character({ moving, wave, sway, reduce }: { moving: boolean; wave: numb
   return (
     <svg viewBox="0 0 120 200" className="h-auto w-full overflow-visible drop-shadow-[0_14px_22px_rgba(0,0,0,0.28)]" aria-hidden>
       {/* the heart balloon, swaying on its string */}
-      <motion.g style={{ rotate: sway, transformOrigin: "88px 104px" }}>
+      <motion.g style={{ rotate: sway ?? 0, transformOrigin: "88px 104px" }}>
         <motion.g animate={reduce ? undefined : { y: [0, -3, 0] }} transition={loop(3.2)}>
           <path d="M88,104 C86,90 92,76 88,60" fill="none" stroke="var(--muted)" strokeWidth={1.2} />
           <path

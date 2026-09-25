@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AlertToaster, LiveStatus } from "../components/alerts";
 import { Shell } from "../components/Shell";
 import { SCENARIO_ICON, ic } from "../components/icons";
+import { AyuWave } from "../components/PageArt";
 import { EmptyState, ErrorState, Eyebrow, LevelDot, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
 import { LEVEL_STYLE, fmtTime } from "../lib/format";
@@ -53,9 +54,12 @@ export default function Demo() {
       <div className="mx-auto max-w-[1400px] px-4 pt-10 pb-20 sm:px-8">
         <Eyebrow>Demo control panel · for the stage</Eyebrow>
         <div className="mt-3 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <h1 className="font-display text-[clamp(40px,5vw,72px)] leading-none">
-            Run the <span className="accent text-teal">ward.</span>
-          </h1>
+          <div className="flex items-end gap-3">
+            <AyuWave className="-mb-2 hidden w-16 shrink-0 sm:block" />
+            <h1 className="font-display text-[clamp(40px,5vw,72px)] leading-none">
+              Run the <span className="accent text-teal">ward.</span>
+            </h1>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="rounded-2xl border border-line bg-surface px-4 py-2.5">
               <div className="eyebrow">Simulated time</div>
