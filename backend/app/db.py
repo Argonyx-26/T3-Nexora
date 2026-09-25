@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from sqlalchemy import event
+from sqlalchemy import event, inspect
 from sqlmodel import Session, SQLModel, create_engine
 
 from .config import settings
@@ -28,6 +28,21 @@ def create_tables() -> None:
     from . import models  # noqa: F401  (registers the tables)
 
     SQLModel.metadata.create_all(engine)
+
+
+def schema_is_current() -> bool:
+    """False when an older database is missing a table or column the models now have."""
+    from . import models  # noqa: F401
+
+    insp = inspect(engine)
+    existing = set(insp.get_table_names())
+    for table in SQLModel.metadata.sorted_tables:
+        if table.name not in existing:
+            return False
+        cols = {c["name"] for c in insp.get_columns(table.name)}
+        if any(c.name not in cols for c in table.columns):
+            return False
+    return True
 
 
 def drop_tables() -> None:

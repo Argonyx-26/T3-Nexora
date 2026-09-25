@@ -53,6 +53,7 @@ def load_context(s: Session, patient_id: str, now: datetime | None = None) -> Pa
             SymptomReport.patient_id == patient_id,
             SymptomReport.ts >= now - timedelta(hours=W.SYMPTOM_LOOKBACK_HOURS),
             SymptomReport.ts <= now,
+            SymptomReport.resolved_at == None,  # noqa: E711
         )
     ).all()
     return PatientContext(

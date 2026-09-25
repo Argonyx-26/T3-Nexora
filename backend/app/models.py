@@ -70,6 +70,7 @@ class SymptomReport(SQLModel, table=True):
     symptom: str  # key into risk.weights.SYMPTOMS
     note: str = ""
     source: str = "patient"  # "patient" | "asha" | "staff" | "sim"
+    resolved_at: NaiveDatetime | None = None  # set when the patient recovers; kept for the log
 
 
 class RiskSnapshot(SQLModel, table=True):
@@ -95,6 +96,7 @@ class Alert(SQLModel, table=True):
     summary: str
     factors: list[dict] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     status: str = "new"  # "new" | "acknowledged" | "resolved"
+    updated_at: NaiveDatetime | None = None  # last escalation
     acknowledged_at: NaiveDatetime | None = None
     resolved_at: NaiveDatetime | None = None
     note: str = ""
