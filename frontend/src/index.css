@@ -1,0 +1,211 @@
+@import "tailwindcss";
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource/instrument-serif/400-italic.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* The whole palette. Light first; .dark swaps the same names. */
+:root {
+  --bg: #fbfbf9;
+  --surface: #ffffff;
+  --surface-2: #f3f3ef;
+  --ink: #0d1117;
+  --ink-2: #394150;
+  --muted: #687182;
+  --faint: #a2a8b1;
+  --line: rgba(13, 17, 23, 0.08);
+  --line-2: rgba(13, 17, 23, 0.15);
+
+  --teal: #0f766e;
+  --teal-bright: #14b8a6;
+  --teal-soft: #e3f6f2;
+
+  --stable: #15803d;
+  --stable-soft: #e5f5ea;
+  --watch: #b45309;
+  --watch-soft: #fdf1dc;
+  --warning: #c2410c;
+  --warning-soft: #fde9dd;
+  --critical: #d92d20;
+  --critical-soft: #fde6e4;
+
+  --chart-grid: #ebebe6;
+  --band: rgba(15, 118, 110, 0.09);
+  --glow: rgba(15, 118, 110, 0.25);
+}
+
+.dark {
+  --bg: #05070a;
+  --surface: #0b0f14;
+  --surface-2: #121821;
+  --ink: #f1f4f6;
+  --ink-2: #c5ccd4;
+  --muted: #8591a0;
+  --faint: #56606c;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.14);
+
+  --teal: #2dd4bf;
+  --teal-bright: #5eead4;
+  --teal-soft: rgba(45, 212, 191, 0.1);
+
+  --stable: #4ade80;
+  --stable-soft: rgba(74, 222, 128, 0.1);
+  --watch: #fbbf24;
+  --watch-soft: rgba(251, 191, 36, 0.1);
+  --warning: #fb923c;
+  --warning-soft: rgba(251, 146, 60, 0.11);
+  --critical: #f87171;
+  --critical-soft: rgba(248, 113, 113, 0.12);
+
+  --chart-grid: #161d26;
+  --band: rgba(45, 212, 191, 0.09);
+  --glow: rgba(45, 212, 191, 0.35);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-teal: var(--teal);
+  --color-teal-bright: var(--teal-bright);
+  --color-teal-soft: var(--teal-soft);
+  --color-stable: var(--stable);
+  --color-stable-soft: var(--stable-soft);
+  --color-watch: var(--watch);
+  --color-watch-soft: var(--watch-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", monospace;
+  --font-display: "Bricolage Grotesque Variable", "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+}
+
+html {
+  background: var(--bg);
+  color: var(--ink);
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.3s ease;
+}
+::selection {
+  background: var(--teal-soft);
+  color: var(--ink);
+}
+/* Bold, tight, heroic display type. Unlayered so it sets the house style for every heading. */
+.font-display {
+  font-weight: 760;
+  letter-spacing: -0.035em;
+  font-variation-settings: "opsz" 96;
+}
+/* The one soft voice against the bold type: an italic serif accent word. */
+.accent {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+.text-shine {
+  background: linear-gradient(100deg, var(--teal) 0%, var(--teal-bright) 30%, #a5f3fc 50%, var(--teal-bright) 70%, var(--teal) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ayu-shine 6s linear infinite;
+  padding-right: 0.08em;
+}
+@keyframes ayu-shine {
+  from { background-position: 100% 0; }
+  to { background-position: -150% 0; }
+}
+.bg-grid {
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+/* Mouse-following light on cards: set --mx / --my from JS. */
+.spotlight {
+  position: relative;
+  isolation: isolate;
+}
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, -40%), var(--teal-soft), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+.spotlight:hover::before {
+  opacity: 1;
+}
+@keyframes ayu-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee {
+  animation: ayu-marquee 60s linear infinite;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.eyebrow:lang(hi) {
+  /* letter-spacing and caps break Devanagari conjuncts */
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+@keyframes ayu-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--critical) 45%, transparent); }
+  70% { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.pulse-critical {
+  animation: ayu-pulse 1.8s ease-out infinite;
+}
+@keyframes ayu-blink {
+  50% { opacity: 0.35; }
+}
+.live-dot {
+  animation: ayu-blink 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-critical, .live-dot, .text-shine, .marquee { animation: none; }
+}

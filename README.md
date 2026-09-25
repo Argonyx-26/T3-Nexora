@@ -13,9 +13,11 @@
 ./run.sh          # macOS / Linux  (Windows: run.bat)
 ```
 
+- Dashboard: **http://localhost:5173**
 - API: http://127.0.0.1:8000 — interactive docs at **http://127.0.0.1:8000/docs**
 - First start creates `backend/.venv` (Python 3.11 via `uv` if installed), copies `.env.example` → `.env`, and seeds a
-  demo database of 10 patients with 7 days of 5-minute vitals. Works fully offline; `GEMINI_API_KEY` is optional.
+  demo database of 10 patients with 7 days of 5-minute vitals, and installs the frontend (Node 18+). Works fully offline;
+  `GEMINI_API_KEY` is optional.
 
 Run the tests:
 
@@ -68,13 +70,18 @@ backend/app/
   api/        REST routers
   main.py     FastAPI app
 backend/tests/  pytest suite
-frontend/       React dashboard (Phase 3)
+frontend/src/
+  pages/        Landing, Doctor (ward), PatientDetail, PatientPortal
+  components/   VitalField (hero canvas), HeroMonitor, charts, motion kit, UI
+  lib/          API client, types, formatting, theme
 ```
 
 ## Status
 
 - [x] Phase 1 — scaffold, models, seed data, risk engine, tests
 - [ ] Phase 2 — live simulator, WebSocket, alerts, scenarios
-- [ ] Phase 3 — doctor dashboard, patient detail
+- [x] Frontend (built ahead of Phase 2) — dark premium UI: landing with live canvas hero and scroll story, ward
+      dashboard, patient detail with baseline-banded charts, patient view in English/हिंदी
+- [ ] Phase 3 — live updates over WebSocket on the dashboard and patient detail
 - [ ] Phase 4 — explanations (Gemini + offline fallback), Hindi, patient portal
 - [ ] Phase 5 — evaluation page, demo panel, polish

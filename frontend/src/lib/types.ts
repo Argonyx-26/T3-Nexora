@@ -1,0 +1,111 @@
+// Mirrors backend/app/schemas.py.
+
+export type Level = "Stable" | "Watch" | "Warning" | "Critical";
+export type VitalKey = "hr" | "spo2" | "sbp" | "dbp" | "rr" | "temp" | "glucose";
+
+export interface Factor {
+  factor: string;
+  kind: string;
+  headline: string;
+  message: string;
+  value: number | null;
+  baseline: number | null;
+  weight: number;
+  contribution: number;
+}
+
+export interface Baseline {
+  mean: number;
+  std: number;
+  low: number;
+  high: number;
+  n: number;
+  source: "history" | "declared";
+}
+
+export interface Risk {
+  patient_id: string;
+  score: number;
+  level: Level;
+  urgency: string;
+  summary: string;
+  recommended_action: string[];
+  factors: Factor[];
+  news2: { total: number; band: string; parameters: Record<string, number>; any_three: boolean; response: string };
+  qsofa: { score: number; criteria: Record<string, boolean>; flag: boolean };
+  baselines: Partial<Record<VitalKey, Baseline>>;
+  deviations: Partial<Record<VitalKey, { value: number; z: number; pct: number; flagged: boolean }>>;
+  trends: Partial<Record<VitalKey, { slope_per_hr: number; t_stat: number; n: number; window_hr: number; flagged: boolean }>>;
+  adherence: { pct: number | null; taken: number; missed: number; missed_critical_recent: string[] };
+  active_symptoms: string[];
+  computed_at: string;
+  disclaimer: string;
+}
+
+export interface RiskBrief {
+  score: number;
+  level: Level;
+  urgency: string;
+  summary: string;
+  news2: number;
+  computed_at: string;
+}
+
+export interface Vital {
+  ts: string;
+  hr: number;
+  spo2: number;
+  sbp: number;
+  dbp: number;
+  rr: number;
+  temp: number;
+  glucose: number | null;
+  on_oxygen: boolean;
+  consciousness: string;
+  source: string;
+}
+
+export interface Patient {
+  id: string;
+  name: string;
+  age: number;
+  sex: "M" | "F";
+  conditions: string[];
+  ward: string;
+  bed: string;
+  language: "en" | "hi";
+  spo2_scale: number;
+  normals: Record<string, { mean: number; std: number }>;
+  notes: string;
+}
+
+export interface PatientSummary extends Patient {
+  risk: RiskBrief;
+  latest: Vital;
+}
+
+export interface Dose {
+  id: number;
+  medication_id: number;
+  scheduled_at: string;
+  status: "taken" | "missed" | "pending";
+  recorded_at: string | null;
+}
+
+export interface Medication {
+  id: number;
+  name: string;
+  dose: string;
+  purpose: string;
+  times: string[];
+  critical: boolean;
+  adherence_pct: number | null;
+  doses: Dose[];
+}
+
+export interface RiskPoint {
+  ts: string;
+  score: number;
+  level: Level;
+  news2: number;
+}
