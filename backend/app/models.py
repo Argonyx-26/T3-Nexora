@@ -20,6 +20,8 @@ class Patient(SQLModel, table=True):
     # vital → {"mean": float, "std": float}: this patient's documented normal
     normals: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     notes: str = ""
+    # past medical history: [{"year": "2018", "event": "Type 2 diabetes diagnosed"}, ...]
+    history: list[dict] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
 
 
 class VitalReading(SQLModel, table=True):
@@ -119,3 +121,34 @@ class Alert(SQLModel, table=True):
     resolved_at: NaiveDatetime | None = None
     note: str = ""
     acknowledged_by: str = ""
+
+
+class DoctorNote(SQLModel, table=True):
+    """A clinician's note on a patient; `visible` ones (and follow-up instructions) are shown to the patient."""
+
+    __table_args__ = (Index("ix_note_patient_ts", "patient_id", "ts"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    patient_id: str = Field(foreign_key="patient.id")
+    ts: NaiveDatetime
+    author: str = "Doctor"
+    kind: str = "note"  # "note" | "followup"
+    text: str
+    visible: bool = True
+    follow_up_on: str = ""  # an ISO date for follow-up instructions, else ""
+
+
+class Appointment(SQLModel, table=True):
+    """An appointment request (from the patient) or booking (from the doctor), in person or by video."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    patient_id: str = Field(foreign_key="patient.id", index=True)
+    created_at: NaiveDatetime
+    requested_by: str = "patient"  # "patient" | "doctor"
+    reason: str = ""
+    preferred: str = ""  # free text from the patient: "tomorrow morning"
+    mode: str = "in_person"  # "in_person" | "video"
+    status: str = "requested"  # "requested" | "confirmed" | "declined" | "done"
+    scheduled_for: NaiveDatetime | None = None
+    video_url: str = ""
+    updated_at: NaiveDatetime | None = None

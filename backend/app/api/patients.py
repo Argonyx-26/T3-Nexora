@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, select
 
 from ..db import engine, get_session
-from ..models import Alert, DailyCheckin, DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
+from ..models import Alert, Appointment, DailyCheckin, DoctorNote, DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
 from ..risk import weights as W
 from ..risk.adherence import effective_status
 from ..risk.types import Dose
@@ -308,7 +308,8 @@ PERSIST = 3  # a level must hold this many readings to count as a change of stat
 
 
 @router.get("/{patient_id}/timeline", response_model=list[TimelineEvent], summary="Important health events, newest first")
-def timeline(patient_id: str, hours: int = Query(48, ge=1, le=168), s: Session = Depends(get_session)):
+def timeline(patient_id: str, hours: int = Query(48, ge=1, le=720), audience: Literal["doctor", "patient"] = "doctor",
+             s: Session = Depends(get_session)):
     get_patient(s, patient_id)
     now = sim.now
     since = now - timedelta(hours=hours)
@@ -376,5 +377,16 @@ def timeline(patient_id: str, hours: int = Query(48, ge=1, le=168), s: Session =
         events.append(TimelineEvent(ts=c.ts, kind="checkin", mood=c.mood, values={"energy": float(c.energy), "sleep": float(c.sleep)},
                                     note=c.note, source=c.source))
 
+    notes = select(DoctorNote).where(DoctorNote.patient_id == patient_id, DoctorNote.ts >= since)
+    if audience == "patient":
+        notes = notes.where(DoctorNote.visible == True)  # noqa: E712 (SQL expression)
+    for n in s.exec(notes).all():
+        events.append(TimelineEvent(ts=n.ts, kind="note", sub=n.kind, note=n.text, by=n.author,
+                                    source="visible" if n.visible else "private"))
+
+    for a in s.exec(select(Appointment).where(Appointment.patient_id == patient_id, Appointment.created_at >= since)).all():
+        events.append(TimelineEvent(ts=a.updated_at or a.created_at, kind="appointment", sub=a.status, note=a.reason,
+                                    source=a.mode, by=a.requested_by))
+
     events.sort(key=lambda e: e.ts, reverse=True)
-    return events[:300]
+    return events[:400]

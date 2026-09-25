@@ -126,6 +126,7 @@ class PatientOut(BaseModel):
     spo2_scale: int
     normals: dict[str, dict[str, float]]
     notes: str
+    history: list[dict] = Field(default_factory=list)
 
 
 class PatientSummary(PatientOut):
@@ -272,7 +273,7 @@ class TimelineEvent(BaseModel):
     """One moment in a patient's health story. The client writes the words (English or Hindi)."""
 
     ts: UTC
-    kind: Literal["status", "symptom", "dose", "reading", "alert", "checkin"]
+    kind: Literal["status", "symptom", "dose", "reading", "alert", "checkin", "note", "appointment"]
     sub: str = ""  # status: the new level · dose: taken/delayed/missed · alert: raised/escalated/acknowledged/resolved
     level: str | None = None
     prev_level: str | None = None

@@ -139,3 +139,33 @@ PATIENTS = [
         "demo": "cardiac",
     },
 ]
+
+# Past medical history for the doctor's profile (synthetic, like everything in this cohort).
+HISTORY: dict[str, list[dict]] = {
+    "P001": [{"year": "2012", "event": "Hypertension diagnosed"}, {"year": "2017", "event": "Type 2 diabetes diagnosed"},
+             {"year": "2024", "event": "Amlodipine increased to 5 mg"}],
+    "P002": [{"year": "2016", "event": "COPD diagnosed (ex-smoker)"}, {"year": "2023", "event": "Admitted with a chest infection"},
+             {"year": "2024", "event": "SpO₂ target set to 88–92%"}],
+    "P003": [{"year": "2026", "event": "Laparoscopic appendectomy, 2 days ago"}],
+    "P004": [{"year": "2019", "event": "Atrial fibrillation diagnosed"}, {"year": "2022", "event": "Heart failure (HFrEF) diagnosed"},
+             {"year": "2025", "event": "Admitted for fluid overload"}],
+    "P005": [{"year": "2003", "event": "Type 1 diabetes diagnosed"}, {"year": "2021", "event": "Diabetic ketoacidosis, ICU stay"}],
+    "P006": [{"year": "2010", "event": "Asthma diagnosed in childhood"}, {"year": "2026", "event": "Admitted after an asthma flare"}],
+    "P007": [{"year": "2015", "event": "Hypertension diagnosed"}, {"year": "2020", "event": "Chronic kidney disease, stage 3"},
+             {"year": "2025", "event": "Lives alone; family reminds him about medicines by phone"}],
+    "P008": [{"year": "2018", "event": "Hypothyroidism diagnosed"}, {"year": "2025", "event": "Iron-deficiency anaemia found"}],
+    "P009": [{"year": "2026", "event": "Dengue fever, recovering; platelets back to normal"}],
+    "P010": [{"year": "2026", "event": "Heart attack (STEMI), stent placed 3 months ago"}, {"year": "2026", "event": "Cardiac rehab started"}],
+}
+
+# Daily check-ins for the last few days (mood 1–5, energy 1–3, sleep 1–3), oldest first.
+# Most people are steady; Harbhajan's mood is sliding (and his weekend doses slip), Lakshmi sleeps badly.
+CHECKINS: dict[str, list[tuple[int, int, int]]] = {
+    "P007": [(4, 2, 2), (4, 2, 2), (3, 2, 1), (2, 1, 1), (2, 1, 1)],
+    "P004": [(3, 2, 2), (3, 1, 1), (3, 2, 1), (3, 1, 1), (3, 2, 1)],
+}
+DEFAULT_CHECKINS = [(4, 2, 3), (4, 3, 2), (3, 2, 2), (4, 2, 3), (4, 3, 3)]
+
+# Weekday → chance of missing a dose (Python weekday: Mon 0 … Sun 6), overriding `adherence` on those days.
+# Harbhajan's family calls on weekdays; at weekends his morning tablets slip.
+MISS_WEEKDAYS: dict[str, dict[int, float]] = {"P007": {5: 0.9, 6: 0.9, 0: 0.05, 1: 0.05, 2: 0.05, 3: 0.05, 4: 0.05}}

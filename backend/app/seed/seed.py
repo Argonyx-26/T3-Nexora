@@ -16,9 +16,9 @@ from sqlmodel import Session, select
 
 from ..config import settings
 from ..db import create_tables, drop_tables, engine
-from ..models import DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
+from ..models import DailyCheckin, DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
 from ..risk import PatientContext, assess
-from .patients import PATIENTS
+from .patients import CHECKINS, DEFAULT_CHECKINS, HISTORY, MISS_WEEKDAYS, PATIENTS
 from .physiology import IST, VitalGenerator
 
 STEP = timedelta(minutes=settings.minutes_per_tick)
@@ -54,7 +54,7 @@ def seed_database(start: datetime | None = None, reset: bool = True) -> datetime
                 id=p["id"], name=p["name"], age=p["age"], sex=p["sex"], conditions=p["conditions"],
                 ward=p["ward"], bed=p["bed"], language=p["language"], spo2_scale=p.get("spo2_scale", 1),
                 normals={v: {"mean": m, "std": sd} for v, (m, sd) in p["normals"].items()},
-                notes=p["notes"],
+                notes=p["notes"], history=HISTORY.get(p["id"], []),
             ))
         s.commit()
 
@@ -83,7 +83,7 @@ def seed_database(start: datetime | None = None, reset: bool = True) -> datetime
                             status, recorded = "pending", None
                         elif at > start - timedelta(hours=24):
                             status, recorded = "taken", at + timedelta(minutes=rng.randint(0, 25))  # a clean last day
-                        elif rng.random() < p["adherence"]:
+                        elif rng.random() >= MISS_WEEKDAYS.get(p["id"], {}).get((at + IST).weekday(), 1 - p["adherence"]):
                             status, recorded = "taken", at + timedelta(minutes=rng.randint(0, 40))
                         else:
                             status, recorded = "missed", None
@@ -91,6 +91,13 @@ def seed_database(start: datetime | None = None, reset: bool = True) -> datetime
                                           "status": status, "recorded_at": recorded})
                 if dose_rows:
                     s.execute(insert(DoseEvent), dose_rows)
+
+            # a check-in each morning (09:00 IST) for the last few days
+            profile = CHECKINS.get(p["id"], DEFAULT_CHECKINS)
+            today_ist = (start + IST).replace(hour=0, minute=0, second=0, microsecond=0)
+            for i, (mood, energy, sleep) in enumerate(profile):
+                at = today_ist - timedelta(days=len(profile) - i) + timedelta(hours=9) - IST
+                s.add(DailyCheckin(patient_id=p["id"], ts=at, mood=mood, energy=energy, sleep=sleep, source="patient"))
 
             for hours_ago, key in p["history_symptoms"]:
                 s.add(SymptomReport(patient_id=p["id"], ts=start - timedelta(hours=hours_ago), symptom=key, source="patient"))
