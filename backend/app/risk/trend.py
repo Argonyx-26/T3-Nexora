@@ -43,7 +43,13 @@ def linear_fit(xs: list[float], ys: list[float]) -> tuple[float, float, float]:
 
 def trend_for(history: list[Reading], vital: str, now: datetime) -> Trend | None:
     start = now - timedelta(hours=W.TREND_WINDOW_HOURS)
-    points = [(r.ts, v) for r in history if r.ts >= start and (v := r.get(vital)) is not None]
+    points = []
+    for r in reversed(history):  # newest first; stop at the window edge instead of scanning 7 days
+        if r.ts < start:
+            break
+        if r.ts <= now and (v := r.get(vital)) is not None:
+            points.append((r.ts, v))
+    points.reverse()
     if len(points) < 3:
         return None
     xs = [(ts - now).total_seconds() / 3600 for ts, _ in points]
