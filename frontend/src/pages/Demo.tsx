@@ -98,6 +98,7 @@ export default function Demo() {
             )}
           </div>
         </div>
+        <p className="mt-4 text-[13px] text-muted">Fast-forward freely: any new or escalated alert drops the ward back to 1×.</p>
         {error && <p className="mt-4 text-[13px] text-critical">{error}</p>}
         {done && !error && <p className="mt-4 font-mono text-[12px] text-stable">Done: {done}</p>}
 

@@ -13,6 +13,8 @@ Alert rules
   a further rise escalates that same alert and marks it new again; it never spams a second one.
 - After an alert is resolved, the same patient can't raise another at the same or a lower
   level for ALERT_COOLDOWN.
+- A new or escalated alert drops the speed back to 1x, so a fast-forwarded ward slows down
+  at the moment worth watching instead of racing past it.
 """
 
 from __future__ import annotations
@@ -261,6 +263,8 @@ class Simulator:
                 s.execute(insert(VitalReading), vital_rows)
                 s.execute(insert(RiskSnapshot), snapshot_rows)
                 s.commit()
+            if new_alerts or changed:
+                self.speed = 1
             return {"type": "tick", "sim": self.state().model_dump(mode="json"), "updates": updates,
                     "new_alerts": new_alerts, "alert_updates": changed}
 

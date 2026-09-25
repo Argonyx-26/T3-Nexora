@@ -163,6 +163,17 @@ def test_speed_pause_and_validation(client):
     assert len(client.get("/sim/scenarios").json()) == 6
 
 
+def test_an_alert_slows_a_fast_ward_back_to_1x(client):
+    client.post("/sim/scenario", json={"patient_id": "P003", "scenario": "sepsis"})
+    client.post("/sim/speed", json={"speed": 5})
+    for _ in range(12 * 4):
+        msg = sim.step()
+        if msg["new_alerts"]:
+            break
+    assert msg["new_alerts"], "sepsis should open an alert within 4 simulated hours"
+    assert msg["sim"]["speed"] == 1 and client.get("/sim").json()["speed"] == 1
+
+
 def test_reset_clears_alerts_and_scenarios(client):
     client.post("/sim/scenario", json={"patient_id": "P006", "scenario": "hypoxia"})
     ticks(12 * 4)
