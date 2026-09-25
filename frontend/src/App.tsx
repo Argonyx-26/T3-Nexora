@@ -1,4 +1,5 @@
-import { MotionConfig } from "framer-motion";
+import { MotionConfig, motion } from "framer-motion";
+import type { ReactNode } from "react";
 import { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -29,6 +30,16 @@ function ScrollToTop() {
   return null;
 }
 
+/** Every screen fades in on arrival. Opacity only: a transform here would re-anchor fixed headers and toasts. */
+function PageFade({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return (
+    <motion.div key={pathname} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}>
+      {children}
+    </motion.div>
+  );
+}
+
 export default function App() {
   return (
     <MotionConfig reducedMotion="user">
@@ -36,6 +47,7 @@ export default function App() {
         <ErrorBoundary>
           <ScrollToTop />
           <Suspense fallback={<ScreenLoading />}>
+          <PageFade>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/doctor" element={<Doctor />} />
@@ -46,6 +58,7 @@ export default function App() {
             <Route path="/patient/:id" element={<PatientHome />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </PageFade>
           </Suspense>
         </ErrorBoundary>
       </BrowserRouter>

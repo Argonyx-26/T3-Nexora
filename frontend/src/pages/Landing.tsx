@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useMotionValueEvent, useScroll, useTransform } from "framer-motion";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { HandHeart, LayoutDashboard, ShieldPlus, Stethoscope, Target, TrendingUp, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { HeroMonitor } from "../components/HeroMonitor";
 import { HospitalStory } from "../components/HospitalStory";
@@ -64,11 +65,13 @@ export default function Landing() {
 }
 
 function TopBar() {
-  const { scrollY } = useScroll();
+  const { scrollY, scrollYProgress } = useScroll();
   const [solid, setSolid] = useState(false);
   useMotionValueEvent(scrollY, "change", (v) => setSolid(v > 40));
   return (
     <header className={cx("fixed inset-x-0 top-0 z-40 border-b transition-all duration-500", solid ? "border-line bg-bg/70 backdrop-blur-xl" : "border-transparent")}>
+      {/* reading progress: a thin teal line that fills as the story scrolls */}
+      <motion.div aria-hidden className="absolute inset-x-0 bottom-[-1px] h-px origin-left bg-teal shadow-[0_0_12px_var(--glow)]" style={{ scaleX: scrollYProgress }} />
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-3 px-4 sm:h-20 sm:px-8">
         <Wordmark />
         <div className="flex items-center gap-2">
@@ -156,8 +159,8 @@ function Hero() {
             transition={{ duration: 0.9, delay: 1.25, ease: EASE }}
             className="flex flex-wrap items-center gap-3"
           >
-            <Button to="/doctor" className="h-13 px-7 text-[15px]">Open the ward dashboard <Arrow /></Button>
-            <Button variant="ghost" to="/patient" className="h-13 px-7 text-[15px] backdrop-blur-md">I'm a patient</Button>
+            <Button to="/doctor" className="h-13 px-7 text-[15px]"><LayoutDashboard size={17} strokeWidth={1.75} aria-hidden /> Open the ward dashboard <Arrow /></Button>
+            <Button variant="ghost" to="/patient" className="h-13 px-7 text-[15px] backdrop-blur-md"><HandHeart size={17} strokeWidth={1.75} aria-hidden /> I'm a patient</Button>
           </motion.div>
         </div>
       </motion.div>
@@ -316,9 +319,9 @@ function Stats() {
 
 function Lenses() {
   const lenses = [
-    { n: "01", title: "The hospital standard", art: <ArtNews2 />, body: "NEWS2, scored exactly as the Royal College of Physicians charts it, plus a qSOFA sepsis screen. AYU is never less alarming than NEWS2.", ex: [["SpO₂ 93%", "+2"], ["RR 22", "+2"], ["HR 95", "+1"], ["NEWS2", "5 · Medium"]] },
-    { n: "02", title: "This patient's normal", art: <ArtBaseline />, body: "Seven days of their own readings, not the average patient's. The last six hours are left out, so a slow decline can't teach itself to look normal.", ex: [["Ramesh · SBP 150", "his normal"], ["Arjun · SBP 150", "z +4.7"], ["Vikram · HR 78", "+50% for a runner"], ["NEWS2 on all three", "0"]] },
-    { n: "03", title: "Which way they're heading", art: <ArtTrend />, body: "A three-hour slope on every vital, counted only when it is steep and sustained. A fall that stays inside 'normal' is still a fall.", ex: [["SpO₂", "−0.9%/hr"], ["Window", "3 h"], ["Significance", "≥ 3 SE"], ["False flags at rest", "≈ 0.1%"]] },
+    { n: "01", icon: ShieldPlus, title: "The hospital standard", art: <ArtNews2 />, body: "NEWS2, scored exactly as the Royal College of Physicians charts it, plus a qSOFA sepsis screen. AYU is never less alarming than NEWS2.", ex: [["SpO₂ 93%", "+2"], ["RR 22", "+2"], ["HR 95", "+1"], ["NEWS2", "5 · Medium"]] },
+    { n: "02", icon: Target, title: "This patient's normal", art: <ArtBaseline />, body: "Seven days of their own readings, not the average patient's. The last six hours are left out, so a slow decline can't teach itself to look normal.", ex: [["Ramesh · SBP 150", "his normal"], ["Arjun · SBP 150", "z +4.7"], ["Vikram · HR 78", "+50% for a runner"], ["NEWS2 on all three", "0"]] },
+    { n: "03", icon: TrendingUp, title: "Which way they're heading", art: <ArtTrend />, body: "A three-hour slope on every vital, counted only when it is steep and sustained. A fall that stays inside 'normal' is still a fall.", ex: [["SpO₂", "−0.9%/hr"], ["Window", "3 h"], ["Significance", "≥ 3 SE"], ["False flags at rest", "≈ 0.1%"]] },
   ];
   return (
     <section className="border-b border-line py-28 sm:py-36">
@@ -336,6 +339,9 @@ function Lenses() {
                 <div className="flex items-center gap-4">
                   <span className="font-mono text-[12px] text-teal">{l.n}</span>
                   <span className="h-px flex-1 bg-gradient-to-r from-line-2 to-transparent" />
+                  <span className="grid size-10 place-items-center rounded-full border border-line text-teal transition-all duration-500 group-hover:rotate-[-8deg] group-hover:border-teal group-hover:bg-teal-soft">
+                    <l.icon size={18} strokeWidth={1.6} aria-hidden />
+                  </span>
                 </div>
                 <div className="mt-8">{l.art}</div>
                 <h3 className="mt-8 font-display text-[34px] leading-[1]">{l.title}</h3>
@@ -438,15 +444,15 @@ function Roles() {
           </h2>
         </Reveal>
         <div className="mt-14 grid gap-4 md:grid-cols-2">
-          <RoleCard to="/doctor" who="Doctor" line="The ward, sorted by risk. Why each patient is there, and what to do next." meta="10 beds · live" art={<div className="w-40 sm:w-44"><ArtWard /></div>} />
-          <RoleCard to="/patient" who="Patient" line="Your status in plain words and your medicines for today — in English or हिंदी. Works for ASHA workers too." meta="English · हिंदी" art={<ArtBreath />} />
+          <RoleCard to="/doctor" icon={Stethoscope} who="Doctor" line="The ward, sorted by risk. Why each patient is there, and what to do next." meta="10 beds · live" art={<div className="w-40 sm:w-44"><ArtWard /></div>} />
+          <RoleCard to="/patient" icon={HandHeart} who="Patient" line="Your status in plain words and your medicines for today — in English or हिंदी. Works for ASHA workers too." meta="English · हिंदी" art={<ArtBreath />} />
         </div>
       </div>
     </section>
   );
 }
 
-function RoleCard({ to, who, line, meta, art }: { to: string; who: string; line: string; meta: string; art: ReactNode }) {
+function RoleCard({ to, who, line, meta, art, icon: Icon }: { to: string; who: string; line: string; meta: string; art: ReactNode; icon: LucideIcon }) {
   return (
     <Reveal>
       <Link
@@ -455,7 +461,7 @@ function RoleCard({ to, who, line, meta, art }: { to: string; who: string; line:
         className="spotlight group relative flex min-h-[420px] flex-col justify-between overflow-hidden rounded-[32px] border border-line bg-surface p-8 transition-all duration-500 hover:border-line-2 sm:p-11"
       >
         <div className="flex items-start justify-between gap-6">
-          <span className="eyebrow">{meta}</span>
+          <span className="eyebrow flex items-center gap-2"><Icon size={14} strokeWidth={1.75} aria-hidden />{meta}</span>
           <div className="transition-transform duration-700 group-hover:scale-105">{art}</div>
         </div>
         <div>
