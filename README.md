@@ -60,28 +60,68 @@ cd backend && .venv/bin/python -m app.seed.seed
 
 Bands: 0–4 Low (any single 3 → Low-Medium, urgent review) · 5–6 Medium · ≥ 7 High.
 
+## Live demo (Phase 2)
+
+The backend runs a live ward: every 2 s (1×) each patient gets a new reading = 5 simulated minutes, is re-scored,
+and the result is pushed over **WebSocket `/ws/live`**. The dashboard updates in place; alerts arrive with a toast and a chime.
+
+- **Demo control panel:** http://localhost:5173/demo — pick a patient, inject a scenario, set 1× / 5× / 20×, pause, reset.
+- **Scenarios:** `sepsis`, `hypoxia`, `hypertensive_crisis`, `cardiac`, `missed_meds`, `recover`.
+- **Alert rules:** an alert opens when a patient's level rises to Watch or above. A further rise escalates the *same*
+  alert (no spam). The level drops only after 3 consecutive lower ticks, so a boundary score can't flap. After an alert is
+  resolved, the same patient can't re-alert at the same level for 30 simulated minutes. States: new → acknowledged → resolved,
+  with the doctor's note.
+
+Measured on the seeded cohort (7 simulated hours, all scenarios running at once):
+
+| Scenario | Patient | AYU Warning | NEWS2 escalation* | AYU earlier by |
+|---|---|---|---|---|
+| Sepsis | Arjun (post-op) | 2.1 h | 3.2 h | ~1.1 h |
+| Sepsis | Vikram (runner, HR 52) | 1.8 h | 3.2 h | ~1.3 h |
+| Hypoxia | Priya | 3.0 h | 3.7 h | ~40 min |
+| Hypertensive crisis | Ramesh (usual SBP 150) | 2.2 h | 4.0 h | ~1.8 h |
+| Missed insulin | Irfan (type 1) | 2.2 h | never | NEWS2 has no glucose |
+
+\*NEWS2 escalation = total ≥ 5 or any single parameter scoring 3. One alert per deteriorating patient; zero alerts on the
+four patients left at rest.
+
+### API
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/patients`, `/patients/{id}` | Live list (highest risk first) and one patient |
+| GET | `/patients/{id}/risk` | Full explainable assessment |
+| GET | `/patients/{id}/vitals?range=6h` · `/risk/history` · `/medications` · `/symptoms` | History |
+| POST | `/patients/{id}/symptoms` | Report symptoms; re-scored at once |
+| POST | `/doses` | Mark a dose taken / missed |
+| GET | `/alerts?status=open` | Alerts |
+| POST | `/alerts/{id}/ack` · `/alerts/{id}/resolve` | With the doctor's note |
+| GET/POST | `/sim`, `/sim/scenarios`, `/sim/scenario`, `/sim/speed`, `/sim/pause`, `/sim/resume`, `/sim/step`, `/sim/reset` | Demo controls |
+| WS | `/ws/live` | Snapshot on connect, then every tick, alert and control change |
+
 ## Project layout
 
 ```
 backend/app/
   risk/       the engine (weights.py, news2, qsofa, baseline, trend, adherence, symptoms, engine)
   seed/       demo cohort + vitals generator
-  services/   database ↔ engine glue
-  api/        REST routers
+  sim/        live simulator + scenarios (alerts, hysteresis, cooldown)
+  services/   database ↔ engine glue, WebSocket hub
+  api/        REST + WebSocket routers
   main.py     FastAPI app
 backend/tests/  pytest suite
 frontend/src/
-  pages/        Landing, Doctor (ward), PatientDetail, PatientPortal
+  pages/        Landing, Doctor (ward), PatientDetail, PatientPortal, Demo
   components/   VitalField (hero canvas), HeroMonitor, charts, motion kit, UI
-  lib/          API client, types, formatting, theme
+  lib/          API client, live WebSocket store, types, formatting, theme
 ```
 
 ## Status
 
 - [x] Phase 1 — scaffold, models, seed data, risk engine, tests
-- [ ] Phase 2 — live simulator, WebSocket, alerts, scenarios
+- [x] Phase 2 — live simulator, WebSocket, alerts, scenarios, demo control panel
 - [x] Frontend (built ahead of Phase 2) — dark premium UI: landing with live canvas hero and scroll story, ward
       dashboard, patient detail with baseline-banded charts, patient view in English/हिंदी
-- [ ] Phase 3 — live updates over WebSocket on the dashboard and patient detail
+- [x] Phase 3 — live dashboard and patient detail over WebSocket, alerts panel with toasts and sound
 - [ ] Phase 4 — explanations (Gemini + offline fallback), Hindi, patient portal
-- [ ] Phase 5 — evaluation page, demo panel, polish
+- [ ] Phase 5 — evaluation page, polish
