@@ -91,14 +91,3 @@ export function Footer() {
     </footer>
   );
 }
-
-/** "Synced 14:05" with a breathing dot; turns amber when the server can't be reached. */
-export function SyncStatus({ at, error }: { at?: Date; error?: Error }) {
-  const ok = !error;
-  return (
-    <div className="hidden items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted sm:flex" role="status">
-      <span className={cx("size-1.5 rounded-full", ok ? "live-dot bg-stable" : "bg-watch")} />
-      {ok ? (at ? `Synced ${at.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}` : "Connecting") : "Reconnecting"}
-    </div>
-  );
-}

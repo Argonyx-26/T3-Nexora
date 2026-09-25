@@ -1,25 +1,68 @@
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Shell, SyncStatus } from "../components/Shell";
+import { AlertCard, AlertToaster, LiveStatus } from "../components/alerts";
+import { Shell } from "../components/Shell";
 import { VitalChart } from "../components/VitalChart";
 import { Card, EmptyState, ErrorState, Eyebrow, RiskBadge, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
-import { DISCLAIMER, LEVEL_STYLE, SYMPTOM_LABEL, VITALS, fmtDay, fmtTime, fmtVital, istDateKey } from "../lib/format";
+import { useLive } from "../lib/live";
+import { DISCLAIMER, LEVEL_STYLE, VITALS, fmtDay, fmtTime, fmtVital, istDateKey } from "../lib/format";
 import type { Factor, Level, Medication, Risk, VitalKey } from "../lib/types";
 
 const RANGES = ["6h", "24h", "7d"] as const;
+
+/** Run `fn` when `value` changes, at most once per `minMs` (trailing call guaranteed). */
+function useThrottledOnChange(value: unknown, minMs: number, fn: () => void) {
+  const last = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const first = useRef(true);
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
+  useEffect(() => {
+    if (value === undefined) return;
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    clearTimeout(timer.current);
+    const fire = () => {
+      last.current = Date.now();
+      fnRef.current();
+    };
+    const wait = last.current + minMs - Date.now();
+    if (wait <= 0) fire();
+    else timer.current = setTimeout(fire, wait);
+  }, [value, minMs]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+}
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 export default function PatientDetail() {
   const { id = "" } = useParams();
   const [range, setRange] = useState<(typeof RANGES)[number]>("6h");
-  const patient = useQuery((s) => api.patient(id, s), [id], 10_000);
-  const risk = useQuery((s) => api.risk(id, s), [id], 10_000);
-  const vitals = useQuery((s) => api.vitals(id, range, 500, s), [id, range], 20_000);
-  const history = useQuery((s) => api.riskHistory(id, "24h", s), [id], 30_000);
-  const meds = useQuery((s) => api.medications(id, s), [id], 30_000);
+  const patient = useQuery((s) => api.patient(id, s), [id], 30_000);
+  const risk = useQuery((s) => api.risk(id, s), [id], 30_000);
+  const vitals = useQuery((s) => api.vitals(id, range, 500, s), [id, range], 60_000);
+  const history = useQuery((s) => api.riskHistory(id, "24h", s), [id], 60_000);
+  const meds = useQuery((s) => api.medications(id, s), [id], 60_000);
+  const symptoms = useQuery((s) => api.symptoms(id, s), [id], 60_000);
+
+  // Every live tick for this patient refreshes the screen (throttled so 20× speed stays smooth).
+  const live = useLive();
+  const tick = live.patients[id]?.vitals.ts;
+  const openAlert = live.alerts.find((a) => a.patient_id === id);
+  useThrottledOnChange(tick, 1500, () => {
+    patient.reload();
+    risk.reload();
+    vitals.reload();
+  });
+  useThrottledOnChange(tick, 6000, () => {
+    history.reload();
+    meds.reload();
+    symptoms.reload();
+  });
 
   if (patient.error && !patient.data) {
     return (
@@ -37,7 +80,8 @@ export default function PatientDetail() {
   const level: Level = r?.level ?? "Stable";
 
   return (
-    <Shell status={<SyncStatus at={risk.refreshedAt} error={risk.error} />}>
+    <Shell status={<LiveStatus />}>
+      <AlertToaster />
       <div className="mx-auto max-w-[1400px] px-4 pt-8 pb-20 sm:px-8">
         <Link to="/doctor" className="group inline-flex items-center gap-2 text-[13px] text-muted hover:text-ink">
           <span className="transition-transform group-hover:-translate-x-0.5">←</span> Ward
@@ -81,6 +125,12 @@ export default function PatientDetail() {
             <Skeleton className="h-24 w-64" />
           )}
         </div>
+
+        {openAlert && (
+          <div className="mt-8 max-w-xl">
+            <AlertCard alert={openAlert} />
+          </div>
+        )}
 
         {/* Action + why */}
         <div className="mt-10 grid gap-4 lg:grid-cols-[380px_1fr] [&>*]:min-w-0">
@@ -161,18 +211,32 @@ export default function PatientDetail() {
         <section className="mt-14 grid gap-4 lg:grid-cols-[1fr_380px] [&>*]:min-w-0">
           <MedsCard meds={meds.data} error={meds.error} onRetry={meds.reload} adherence={r?.adherence.pct ?? null} />
           <Card className="p-6">
-            <Eyebrow>Symptoms · last 12 h</Eyebrow>
+            <Eyebrow>Symptom log · 7 days</Eyebrow>
             <div className="mt-4">
-              {!r ? <Skeleton className="h-24" /> : r.active_symptoms.length === 0 ? (
+              {symptoms.error && !symptoms.data ? (
+                <ErrorState error={symptoms.error} onRetry={symptoms.reload} />
+              ) : !symptoms.data ? (
+                <Skeleton className="h-24" />
+              ) : symptoms.data.length === 0 ? (
                 <EmptyState title="None reported">Symptoms logged by the patient or an ASHA worker appear here.</EmptyState>
               ) : (
                 <ul className="space-y-2">
-                  {r.active_symptoms.map((s) => (
-                    <li key={s} className="flex items-baseline justify-between rounded-xl bg-surface-2 px-4 py-2.5 text-[14px]">
-                      <span>{SYMPTOM_LABEL[s]?.en ?? s}</span>
-                      <span className="text-[12px] text-muted">{SYMPTOM_LABEL[s]?.hi}</span>
-                    </li>
-                  ))}
+                  {symptoms.data.slice(0, 8).map((x) => {
+                    const active = !x.resolved_at && r?.active_symptoms.includes(x.symptom);
+                    return (
+                      <li key={x.id} className={cx("rounded-xl px-4 py-2.5", active ? (x.red_flag ? "bg-critical-soft" : "bg-watch-soft") : "bg-surface-2")}>
+                        <div className="flex items-baseline justify-between gap-3 text-[14px]">
+                          <span className={cx(active && x.red_flag && "text-critical", active && "font-medium")}>{x.label_en}</span>
+                          <span className="text-[12px] text-muted">{x.label_hi}</span>
+                        </div>
+                        <div className="mt-0.5 font-mono text-[10px] text-muted">
+                          {fmtTime(x.ts)} · {x.source}
+                          {x.red_flag && " · red flag"}
+                          {x.resolved_at ? " · resolved" : active ? " · active" : ""}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
