@@ -23,7 +23,7 @@ import random
 import threading
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from sqlalchemy import func, insert
 from sqlmodel import Session, col, select
@@ -35,7 +35,7 @@ from ..risk import Dose, PatientContext, Reading, RiskResult, SymptomEntry, asse
 from ..risk import weights as W
 from ..risk.baseline import all_baselines
 from ..schemas import AlertOut, FactorOut, LiveRisk, LiveUpdate, SimState, VitalOut
-from ..seed.physiology import VitalGenerator
+from ..seed.physiology import IST, VitalGenerator
 from ..services.hub import hub
 from ..services.serialize import risk_brief
 from .scenarios import RECOVER_KEY, SCENARIOS, recover_offsets
@@ -50,6 +50,7 @@ HISTORY_KEEP = timedelta(hours=W.BASELINE_WINDOW_HOURS + 1)
 RECOVER_DONE_H = 3.0
 SPEEDS = (1, 5, 20)
 MISSED_LOOKBACK = timedelta(hours=12)
+SCHEDULE_AHEAD = timedelta(hours=36)  # keep tomorrow's doses scheduled however fast the clock runs
 
 
 @dataclass
@@ -95,6 +96,8 @@ class PState:
     below: int = 0
     pending_watch: bool = False  # a rise to Watch waiting for the next tick to confirm it
     sources: dict = field(default_factory=dict)  # reading ts → "manual" / "asha" / "staff" for typed-in readings
+    meds: list = field(default_factory=list)  # (medication id, name, critical, ["08:00", ...])
+    dose_horizon: datetime | None = None  # doses are scheduled up to here
     open_alert_id: int | None = None
     last_alert_at: datetime | None = None
     last_alert_level: str = "Stable"
@@ -155,6 +158,7 @@ class Simulator:
                         .order_by(col(DoseEvent.scheduled_at))
                     ).all()
                 ]
+                meds = [(m.id, m.name, m.critical, list(m.times)) for m in s.exec(select(Medication).where(Medication.patient_id == p.id)).all()]
                 symptoms = [
                     SymRec(id=x.id, ts=x.ts, key=x.symptom)
                     for x in s.exec(
@@ -168,8 +172,10 @@ class Simulator:
                 ps = PState(
                     info=p.model_dump(), normals=normals,
                     gen=VitalGenerator(normals, random.Random(f"{settings.seed}-live-{p.id}")),
-                    history=history, doses=doses, symptoms=symptoms,
+                    history=history, doses=doses, symptoms=symptoms, meds=meds,
+                    dose_horizon=max((d.scheduled_at for d in doses), default=self.now),
                 )
+                self._schedule_doses(ps, s)
                 last = history[-1] if history else None
                 if last:
                     ps.consciousness, ps.on_oxygen = last.consciousness, last.on_oxygen
@@ -185,6 +191,7 @@ class Simulator:
                 ps.risk = assess(self._ctx(ps))
                 ps.held = ps.risk.level
                 self.states[p.id] = ps
+            s.commit()
             self.ticks = 0
             self.loaded = True
         log.info("simulator loaded %d patients at %s", len(self.states), self.now)
@@ -231,6 +238,7 @@ class Simulator:
             with Session(engine) as s:
                 for ps in self.states.values():
                     self._run_scenario(ps, s)
+                    self._schedule_doses(ps, s)
                     self._take_due_doses(ps, s)
                     offsets, noise = self._offsets(ps)
                     values = ps.gen.next(self.now, offsets, noise)
@@ -281,6 +289,33 @@ class Simulator:
                         row = s.get(DoseEvent, d.id)
                         if row:
                             row.status, row.recorded_at = "missed", None
+
+    def _schedule_doses(self, ps: PState, s: Session) -> None:
+        """Create each medicine's doses for the coming day(s) as the clock moves on."""
+        target = self.now + SCHEDULE_AHEAD
+        if ps.dose_horizon is not None and ps.dose_horizon >= target:
+            return
+        start = ps.dose_horizon or self.now
+        day = (start + IST).date()
+        last_day = (target + IST).date()
+        added = []
+        while day <= last_day:
+            for med_id, name, critical, times in ps.meds:
+                for hhmm in times:
+                    h, m = (int(x) for x in hhmm.split(":"))
+                    at = datetime.combine(day, time(h, m)) - IST
+                    if start < at <= target:
+                        row = DoseEvent(medication_id=med_id, patient_id=ps.id, scheduled_at=at, status="pending")
+                        s.add(row)
+                        added.append((row, name, critical))
+            day += timedelta(days=1)
+        if added:
+            s.flush()
+            ps.doses.extend(DoseRec(id=r.id, medication=n, critical=c, scheduled_at=r.scheduled_at, status="pending") for r, n, c in added)
+            ps.doses.sort(key=lambda d: d.scheduled_at)
+        ps.dose_horizon = target
+        cutoff = self.now - timedelta(days=8)
+        ps.doses = [d for d in ps.doses if d.scheduled_at >= cutoff]
 
     def _take_due_doses(self, ps: PState, s: Session) -> None:
         for d in ps.doses:

@@ -183,3 +183,18 @@ def test_websocket_sends_snapshot_then_live_messages(client):
         assert msg["type"] == "tick" and len(msg["updates"]) == 10
         ws.send_text("ping")
         assert ws.receive_json() == {"type": "pong"}
+
+
+def test_doses_keep_being_scheduled_as_the_clock_runs_ahead(client):
+    from datetime import timedelta
+
+    sim.now += timedelta(days=4)  # e.g. a long 20x demo run
+    sim.step()
+    meds = client.get("/patients/P005/medications").json()
+    upcoming = [d for m in meds for d in m["doses"] if d["status"] == "pending"]
+    assert upcoming, "tomorrow's insulin must be scheduled"
+    ids = [d["id"] for m in meds for d in m["doses"]]
+    assert len(ids) == len(set(ids))
+    sim.step()  # scheduling again adds nothing twice
+    again = [d["id"] for m in client.get("/patients/P005/medications").json() for d in m["doses"]]
+    assert len(again) == len(set(again))
