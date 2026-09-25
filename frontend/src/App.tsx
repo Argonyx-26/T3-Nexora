@@ -1,13 +1,24 @@
 import { MotionConfig } from "framer-motion";
+import { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
-import { useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import Demo from "./pages/Demo";
-import Doctor from "./pages/Doctor";
 import Landing from "./pages/Landing";
-import NotFound from "./pages/NotFound";
-import PatientDetail from "./pages/PatientDetail";
-import { PatientHome, PatientPicker } from "./pages/PatientPortal";
+
+// The landing page ships in the first bundle; every other screen loads on demand.
+const Doctor = lazy(() => import("./pages/Doctor"));
+const PatientDetail = lazy(() => import("./pages/PatientDetail"));
+const Demo = lazy(() => import("./pages/Demo"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const PatientPicker = lazy(() => import("./pages/PatientPortal").then((m) => ({ default: m.PatientPicker })));
+const PatientHome = lazy(() => import("./pages/PatientPortal").then((m) => ({ default: m.PatientHome })));
+
+function ScreenLoading() {
+  return (
+    <div className="grid min-h-dvh place-items-center" role="status" aria-label="Loading">
+      <span className="live-dot size-2 rounded-full bg-teal" />
+    </div>
+  );
+}
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -23,6 +34,7 @@ export default function App() {
       <BrowserRouter>
         <ErrorBoundary>
           <ScrollToTop />
+          <Suspense fallback={<ScreenLoading />}>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/doctor" element={<Doctor />} />
@@ -32,6 +44,7 @@ export default function App() {
             <Route path="/patient/:id" element={<PatientHome />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </ErrorBoundary>
       </BrowserRouter>
     </MotionConfig>
