@@ -1,5 +1,7 @@
 # AYU — Intelligent Early Health-Risk Detection & Decision Support
 
+[![CI](https://github.com/Argonyx-26/T3-Nexora/actions/workflows/ci.yml/badge.svg)](https://github.com/Argonyx-26/T3-Nexora/actions/workflows/ci.yml)
+
 **Team AYU · Argonyx'26, RV College** — Ishan Sharma (lead), Aryan Verma, Harshit Kandpal, Vinay
 
 > Hospitals use NEWS2, which applies the same thresholds to everyone. AYU adds a **personal baseline** for each
