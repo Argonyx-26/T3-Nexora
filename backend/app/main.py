@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -10,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, func, select
 
 from .api import alerts, patients, ws
+from .api import eval as eval_api
 from .api import sim as sim_api
 from .config import settings
 from .db import create_tables, engine, schema_is_current
@@ -35,6 +37,7 @@ async def lifespan(_: FastAPI):
     sim.load()
     if settings.sim_autostart:
         sim.start()
+        asyncio.create_task(eval_api.lead_time_result())  # warm the evaluation in the background
     yield
     await sim.stop()
 
@@ -62,6 +65,7 @@ app.add_middleware(
 app.include_router(patients.router)
 app.include_router(alerts.router)
 app.include_router(sim_api.router)
+app.include_router(eval_api.router)
 app.include_router(ws.router)
 
 

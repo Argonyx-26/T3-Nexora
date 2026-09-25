@@ -37,6 +37,7 @@ class Settings:
     tick_seconds: float = float(os.getenv("SIM_TICK_SECONDS", "2"))
     minutes_per_tick: int = int(os.getenv("SIM_MINUTES_PER_TICK", "5"))
     sim_autostart: bool = _bool("SIM_AUTOSTART", True)
+    eval_seeds: int = int(os.getenv("AYU_EVAL_SEEDS", "5"))
 
 
 settings = Settings()

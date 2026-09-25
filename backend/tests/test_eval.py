@@ -51,3 +51,16 @@ def test_missed_insulin_is_invisible_to_news2_at_first(result):
     assert mm["urgent"]["ayu_never"] == 0
     irfan = next(r for r in result["runs"] if r["scenario"] == "missed_meds" and r["patient_id"] == "P005")
     assert irfan["urgent"]["news2_h"] is None or irfan["urgent"]["news2_h"] > irfan["urgent"]["ayu_h"] + 2
+
+
+def test_lead_time_endpoint():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as c:
+        r = c.get("/eval/lead-time")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["config"]["seeds"] == 1
+        assert body["summary"]["urgent"]["news2_first"] == 0
