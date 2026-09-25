@@ -5,13 +5,13 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { DISCLAIMER } from "../lib/format";
 import { useTheme } from "../lib/theme";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { Logo } from "./Logo";
 import { cx } from "./ui";
 
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <Link to="/" className={cx("group inline-flex items-baseline gap-1.5", className)} aria-label="AYU home">
-      <span className="font-display text-[26px] leading-none tracking-tight">AYU</span>
-      <span className="size-1.5 rounded-full bg-teal transition-transform duration-300 group-hover:scale-150" />
+    <Link to="/" className={cx("group inline-flex shrink-0 items-center", className)} aria-label="AYU home">
+      <Logo size={26} />
     </Link>
   );
 }

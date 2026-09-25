@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { LogoMark } from "./components/Logo";
 import Landing from "./pages/Landing";
 
 // The landing page ships in the first bundle; every other screen loads on demand.
@@ -17,7 +18,10 @@ const PatientHome = lazy(() => import("./pages/PatientPortal").then((m) => ({ de
 function ScreenLoading() {
   return (
     <div className="grid min-h-dvh place-items-center" role="status" aria-label="Loading">
-      <span className="live-dot size-2 rounded-full bg-teal" />
+      <div className="flex flex-col items-center gap-4">
+        <LogoMark size={56} fast />
+        <span className="eyebrow">Loading the ward…</span>
+      </div>
     </div>
   );
 }
