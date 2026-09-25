@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AlertItem, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
+import type { AlertItem, ChatReply, ChatTurn, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "http://127.0.0.1:8000";
 
@@ -44,6 +44,8 @@ export const api = {
   reportSymptoms: (id: string, symptoms: string[], source: ReadingSource = "patient", note = "") => post<Risk>(`/patients/${id}/symptoms`, { symptoms, source, note }),
   recordDose: (doseId: number, status: "taken" | "missed") => post<Risk>("/doses", { dose_id: doseId, status }),
   explanation: (id: string, lang: "en" | "hi", s?: AbortSignal) => get<Explanation>(`/patients/${id}/explanation?lang=${lang}`, s),
+  chat: (id: string, message: string, lang: "en" | "hi", history: ChatTurn[]) =>
+    post<ChatReply>(`/patients/${id}/chat`, { message, lang, history: history.slice(-12) }),
   logVitals: (id: string, values: VitalsInput, source: ReadingSource = "patient") => post<Risk>(`/patients/${id}/vitals`, { ...values, source }),
   leadTime: (s?: AbortSignal) => get<EvalResult>("/eval/lead-time", s),
   sim: (s?: AbortSignal) => get<SimState>("/sim", s),

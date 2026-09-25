@@ -2,13 +2,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Shell } from "../components/Shell";
-import { Check, ClipboardList, Clock, HandHeart, Languages, NotebookPen, Pill, Send, TriangleAlert, UserRound } from "lucide-react";
-import { LEVEL_ICON, VITAL_ICON, ic } from "../components/icons";
+import { ClipboardList, HandHeart, Languages, NotebookPen, Send, TriangleAlert, UserRound } from "lucide-react";
+import { VITAL_ICON, ic } from "../components/icons";
 import { PatientArt } from "../components/Illustrations";
-import { BeatingHeart, PillsArt } from "../components/PageArt";
-import { Card, EmptyState, ErrorState, Eyebrow, Skeleton, cx } from "../components/ui";
+import { AdherenceTracker, AssistantChat, DailyCard, HealthSummary, Overview, Prescriptions, PulseOxTracker, WeatherCard } from "../components/PatientDashboard";
+import { ErrorState, Eyebrow, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
-import { DISCLAIMER, LEVEL_STYLE, RED_FLAG_SYMPTOMS, SYMPTOM_LABEL, fmtTime, fmtVital, initials, istDateKey } from "../lib/format";
+import { DISCLAIMER, RED_FLAG_SYMPTOMS, SYMPTOM_LABEL, initials } from "../lib/format";
 import { useLive } from "../lib/live";
 import type { Level, VitalKey, VitalsInput } from "../lib/types";
 
@@ -114,7 +114,10 @@ export function PatientPicker() {
 export function PatientHome() {
   const { id = "" } = useParams();
   const patient = useQuery((s) => api.patient(id, s), [id], 30_000);
+  const risk = useQuery((s) => api.risk(id, s), [id], 30_000);
   const meds = useQuery((s) => api.medications(id, s), [id], 60_000);
+  const vitals = useQuery((s) => api.vitals(id, "24h", 96, s), [id], 60_000);
+  const symptoms = useQuery((s) => api.symptoms(id, s), [id], 60_000);
   const [lang, setLang] = useState<Lang | null>(null);
   const [asha, setAsha] = useState(false);
   const p = patient.data;
@@ -122,15 +125,33 @@ export function PatientHome() {
   const t = T[l];
   const source = asha ? "asha" : "patient";
 
-  // Live: the status follows the ward stream; the plain sentence comes from the explainer.
+  // Live: the dashboard follows the ward stream (throttled), the plain sentence comes from the explainer.
   const live = useLive();
   const tick = live.patients[id]?.vitals.ts;
-  const lastReload = useRef(0);
+  const lastFast = useRef(0);
+  const lastSlow = useRef(0);
   useEffect(() => {
-    if (!tick || Date.now() - lastReload.current < 3000) return;
-    lastReload.current = Date.now();
-    patient.reload();
+    if (!tick) return;
+    const now = Date.now();
+    if (now - lastFast.current >= 3000) {
+      lastFast.current = now;
+      patient.reload();
+      risk.reload();
+    }
+    if (now - lastSlow.current >= 10_000) {
+      lastSlow.current = now;
+      vitals.reload();
+      meds.reload();
+      symptoms.reload();
+    }
   }, [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const refreshAll = () => {
+    patient.reload();
+    risk.reload();
+    vitals.reload();
+    meds.reload();
+    symptoms.reload();
+  };
   const level = p?.risk.level;
   const bucket = p ? Math.floor(p.risk.score / 5) : -1;
   const explanation = useQuery((s) => api.explanation(id, l, s), [id, l, level, bucket]);
@@ -140,13 +161,12 @@ export function PatientHome() {
   }
 
   const status = p ? STATUS[p.risk.level][l] : null;
-  const today = p ? istDateKey(p.latest.ts) : "";
-  const todays = meds.data?.flatMap((m) => m.doses.filter((d) => istDateKey(d.scheduled_at) === today).map((d) => ({ m, d })))
-    .sort((a, b) => a.d.scheduled_at.localeCompare(b.d.scheduled_at));
+  const hr = live.patients[id]?.vitals.hr ?? p?.latest.hr;
+  const recentSymptoms = symptoms.data?.length;
 
   return (
     <Shell>
-      <div lang={l} className="mx-auto max-w-3xl px-4 pt-10 pb-24 sm:px-8">
+      <div lang={l} className="mx-auto max-w-6xl px-4 pt-10 pb-28 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link to="/patient" className="text-[13px] text-muted hover:text-ink">← {t.notYou}</Link>
           <div className="flex items-center gap-2">
@@ -180,64 +200,56 @@ export function PatientHome() {
           )}
         </AnimatePresence>
 
-        {!p || !status ? (
-          <Skeleton className="mt-8 h-72 rounded-[28px]" />
-        ) : (
-          <motion.div key={l + p.risk.level} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className={cx("relative mt-8 overflow-hidden rounded-[28px] p-8 sm:p-10", LEVEL_STYLE[p.risk.level].soft)}>
-            <StatusMark level={p.risk.level} />
-            <div className="eyebrow">{t.hello}, {p.name.split(" ")[0]}</div>
-            <h1 className={cx("mt-4 font-display text-[clamp(40px,6vw,68px)] leading-[1.02]", LEVEL_STYLE[p.risk.level].text)}>{status.title}</h1>
-            <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink">
-              {explanation.data?.lang === l && explanation.data.level === p.risk.level ? explanation.data.patient : status.body}
-            </p>
-          </motion.div>
-        )}
+        {/* 5 · Today + 6 · Weather */}
+        <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+          {p ? <DailyCard lang={l} name={p.name.split(" ")[0]} /> : <Skeleton className="h-52 rounded-3xl" />}
+          {p ? <WeatherCard lang={l} conditions={p.conditions} /> : <Skeleton className="h-52 rounded-3xl" />}
+        </div>
 
+        {/* 7 · AI health summary with the glowing heart */}
+        <div className="mt-4">
+          {!p || !status ? (
+            <Skeleton className="h-72 rounded-[28px]" />
+          ) : (
+            <HealthSummary
+              risk={risk.data}
+              lang={l}
+              hr={hr}
+              title={status.title}
+              sentence={explanation.data?.lang === l && explanation.data.level === p.risk.level ? explanation.data.patient : status.body}
+            />
+          )}
+        </div>
+
+        {/* 4 · Overall health */}
         {p && (
-          <section className="mt-10">
-            <Eyebrow icon={Clock}>{t.readings} · {fmtTime(p.latest.ts)}</Eyebrow>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {([
-                ["hr", t.hr, fmtVital("hr", p.latest.hr), "bpm"],
-                ["spo2", t.spo2, fmtVital("spo2", p.latest.spo2), "%"],
-                ["sbp", t.bp, `${fmtVital("sbp", p.latest.sbp)}/${fmtVital("dbp", p.latest.dbp)}`, "mmHg"],
-                ["temp", t.temp, fmtVital("temp", p.latest.temp), "°C"],
-              ] as const).map(([key, label, value, unit]) => (
-                <Card key={label} className="px-4 py-4">
-                  <div className="flex items-center gap-1.5 text-[12px] text-muted"><VitalIcon k={key} />{label}</div>
-                  <div className="mt-1 flex items-center gap-2 font-mono text-[24px] leading-none tnum">
-                    {value}<span className="-ml-1 text-[11px] text-muted">{unit}</span>
-                    {key === "hr" && <BeatingHeart bpm={p.latest.hr} size={16} className="ml-auto" />}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </section>
+          <div className="mt-10">
+            <Overview p={p} risk={risk.data} vitals={vitals.data} symptomsCount={recentSymptoms} lang={l}
+              labels={{ hr: t.hr, spo2: t.spo2, bp: t.bp, temp: t.temp }} />
+          </div>
         )}
 
-        <section className="mt-10">
-          <div className="flex items-end justify-between gap-4">
-            <Eyebrow icon={Pill}>{t.meds}</Eyebrow>
-            <PillsArt className="-mb-1 w-20" />
-          </div>
-          <div className="mt-4">
-            {meds.error && !meds.data ? <ErrorState error={meds.error} onRetry={meds.reload} /> : !todays ? <Skeleton className="h-32" /> : todays.length === 0 ? (
-              <EmptyState title={t.none} />
-            ) : (
-              <div className="divide-y divide-line rounded-3xl border border-line bg-surface">
-                {todays.map(({ m, d }) => (
-                  <DoseRow key={d.id} name={m.name} dose={m.dose} purpose={m.purpose} time={fmtTime(d.scheduled_at)} status={d.status}
-                    canMark={d.status === "pending" && p !== undefined && Date.parse(d.scheduled_at) <= Date.parse(p.latest.ts) + 60 * 60_000}
-                    t={t} onMark={async () => { await api.recordDose(d.id, "taken"); meds.reload(); patient.reload(); }} />
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
+        {/* 1 · Prescriptions + 2 · Doses & adherence */}
+        <div className="mt-10 grid gap-4 lg:grid-cols-2">
+          {meds.error && !meds.data ? (
+            <div className="lg:col-span-2"><ErrorState error={meds.error} onRetry={meds.reload} /></div>
+          ) : (
+            <>
+              <Prescriptions meds={meds.data} lang={l} now={p?.latest.ts} />
+              <AdherenceTracker meds={meds.data} lang={l} now={p?.latest.ts} onChanged={refreshAll} />
+            </>
+          )}
+        </div>
 
-        {p && <LogReading patientId={id} source={source} t={t} onSaved={() => patient.reload()} />}
-        {p && <SymptomChecklist patientId={id} source={source} lang={l} t={t} onSent={() => patient.reload()} />}
+        {/* 3 · Heart rate & SpO₂ */}
+        <div className="mt-4">
+          <PulseOxTracker patientId={id} vitals={vitals.data} source={source} lang={l} onSaved={refreshAll} />
+        </div>
+
+        <div className="grid gap-x-4 lg:grid-cols-2">
+          {p && <LogReading patientId={id} source={source} t={t} onSaved={refreshAll} />}
+          {p && <SymptomChecklist patientId={id} source={source} lang={l} t={t} onSent={refreshAll} />}
+        </div>
 
         <section className="mt-10 flex flex-col items-center gap-4 rounded-3xl border border-dashed border-line-2 p-6 sm:flex-row sm:gap-6">
           <PatientArt className="w-44 shrink-0" />
@@ -248,6 +260,8 @@ export function PatientHome() {
         </section>
         <p className="mt-8 text-[12px] leading-relaxed text-muted">{DISCLAIMER}</p>
       </div>
+      {/* 8 · Assistant */}
+      {p && <AssistantChat patientId={id} lang={l} />}
     </Shell>
   );
 }
@@ -259,66 +273,7 @@ function VitalIcon({ k }: { k: VitalKey }) {
   return <Icon {...ic(13)} className="shrink-0" />;
 }
 
-/** The status card's big, slowly breathing mark: a tick when fine, a siren when not. */
-function StatusMark({ level }: { level: Level }) {
-  const Icon = LEVEL_ICON[level];
-  return (
-    <motion.span
-      aria-hidden
-      className={cx("pointer-events-none absolute -right-8 -bottom-10 sm:right-6 sm:bottom-5", LEVEL_STYLE[level].text)}
-      animate={{ scale: [1, 1.06, 1], opacity: [0.18, 0.28, 0.18] }}
-      transition={{ duration: level === "Stable" ? 5 : 1.8, repeat: Infinity, ease: "easeInOut" }}
-    >
-      <Icon size={112} strokeWidth={1.1} />
-    </motion.span>
-  );
-}
 
-function DoseRow({ name, dose, purpose, time, status, canMark, t, onMark }: {
-  name: string; dose: string; purpose: string; time: string; status: string; canMark: boolean; t: Texts; onMark: () => Promise<void>;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  return (
-    <div className="flex flex-wrap items-center gap-4 px-5 py-4">
-      <span className="w-14 font-mono text-[14px] tnum text-muted">{time}</span>
-      <div className="min-w-0 flex-1">
-        <div className="text-[15px] font-medium">{name} <span className="font-normal text-muted">{dose}</span></div>
-        <div className="text-[12px] text-muted">{purpose}</div>
-        {error && <div className="mt-1 text-[12px] text-critical">{error}</div>}
-      </div>
-      {canMark ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            setError(undefined);
-            try {
-              await onMark();
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-medium text-bg transition-colors hover:bg-teal disabled:opacity-60"
-        >
-          <Check {...ic(15)} />
-          {busy ? t.saving : t.markTaken}
-        </button>
-      ) : (
-        <span className={cx("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px]",
-          status === "taken" && "bg-teal-soft text-teal",
-          status === "missed" && "bg-critical-soft text-critical",
-          status === "pending" && "border border-line-2 text-muted")}>
-          {status === "taken" && <Check {...ic(13)} />}
-          {status === "taken" ? t.taken : status === "missed" ? t.missed : t.due}
-        </span>
-      )}
-    </div>
-  );
-}
 
 function LogReading({ patientId, source, t, onSaved }: { patientId: string; source: "patient" | "asha"; t: Texts; onSaved: () => void }) {
   const [values, setValues] = useState<Partial<Record<FieldKey, string>>>({});

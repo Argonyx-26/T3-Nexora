@@ -224,3 +224,16 @@ export interface EvalResult {
   rest: ({ patient_id: string; patient_name: string; patient_days: number } & Record<Tier, { ayu: number; news2: number }>)[];
   example: { scenario: string; patient_id: string; patient_name: string; points: { h: number; ayu: number; news2: number }[] };
 }
+
+export interface ChatTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
+export interface ChatReply {
+  reply: string;
+  urgent: boolean;
+  source: "safety" | "gemini" | "builtin";
+  model: string | null;
+  disclaimer: string;
+}
