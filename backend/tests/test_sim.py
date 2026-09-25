@@ -49,6 +49,29 @@ def test_quiet_ward_raises_no_alerts(client):
     assert open_alerts(client) == []
 
 
+def test_single_reading_blip_does_not_alert(client):
+    ps = sim.states["P006"]
+    real = ps.gen.next
+    calls = {"n": 0}
+
+    def one_spike(ts, offsets=None, extra_noise=None):
+        values = real(ts, offsets, extra_noise)
+        calls["n"] += 1
+        if calls["n"] == 1:
+            values["sbp"] = 85.0  # NEWS2 scores this 3 on its own
+        return values
+
+    ps.gen.next = one_spike
+    try:
+        sim.step()
+        assert ps.risk.level == "Watch"  # the blip itself is scored honestly
+        ticks(3)
+    finally:
+        ps.gen.next = real
+    assert open_alerts(client, "P006") == []
+    assert ps.held == "Stable"
+
+
 def test_hypoxia_raises_one_alert_that_escalates(client):
     assert client.post("/sim/scenario", json={"patient_id": "P006", "scenario": "hypoxia"}).status_code == 200
     ticks(12 * 5)

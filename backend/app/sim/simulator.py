@@ -8,7 +8,8 @@ risk snapshot, dose and alert is also written to SQLite.
 Alert rules
 - The *held* level rises the moment the risk level rises, but only drops after the risk
   has stayed lower for DROP_AFTER_TICKS ticks, so a score hovering on a boundary can't flap.
-- A rise to Watch or above opens an alert. While an alert is open (new or acknowledged)
+- A rise to Warning or Critical opens an alert at once; a rise to Watch must still hold on
+  the next tick, so a single odd reading can't raise one. While an alert is open (new or acknowledged)
   a further rise escalates that same alert and marks it new again; it never spams a second one.
 - After an alert is resolved, the same patient can't raise another at the same or a lower
   level for ALERT_COOLDOWN.
@@ -92,6 +93,7 @@ class PState:
     risk: RiskResult | None = None
     held: str = "Stable"
     below: int = 0
+    pending_watch: bool = False  # a rise to Watch waiting for the next tick to confirm it
     open_alert_id: int | None = None
     last_alert_at: datetime | None = None
     last_alert_level: str = "Stable"
@@ -308,6 +310,17 @@ class Simulator:
                 ps.held, ps.below = level, 0
         else:
             ps.below = 0
+        # A rise to Watch must still hold on the next tick before it alerts, so one odd reading
+        # can't page a doctor. Warning and Critical alert at once.
+        if rose and ps.held == "Watch":
+            ps.pending_watch = True
+            return []
+        if ps.pending_watch:
+            ps.pending_watch = False
+            if RANK[level] < RANK["Watch"]:
+                ps.held, ps.below = level, 0  # a one-reading blip: forget it, so a real rise can alert later
+                return []
+            rose = True
         if not rose or ps.held == "Stable":
             return []
 
