@@ -109,3 +109,69 @@ export interface RiskPoint {
   level: Level;
   news2: number;
 }
+
+// --- Live (WebSocket) ---------------------------------------------------------------
+
+export interface LiveRisk extends RiskBrief {
+  alert_level: Level;
+  qsofa_flag: boolean;
+  top_factors: string[];
+}
+
+export interface LiveUpdate {
+  patient_id: string;
+  vitals: Vital;
+  risk: LiveRisk;
+  scenario: string | null;
+}
+
+export interface AlertItem {
+  id: number;
+  patient_id: string;
+  patient_name: string;
+  bed: string;
+  created_at: string;
+  updated_at: string | null;
+  level: Level;
+  prev_level: string;
+  score: number;
+  title: string;
+  summary: string;
+  factors: Factor[];
+  status: "new" | "acknowledged" | "resolved";
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  note: string;
+  acknowledged_by: string;
+  disclaimer: string;
+}
+
+export interface SimState {
+  sim_time: string;
+  speed: number;
+  paused: boolean;
+  running: boolean;
+  tick_seconds: number;
+  minutes_per_tick: number;
+  scenarios: Record<string, string>;
+}
+
+export interface ScenarioInfo {
+  key: string;
+  label: string;
+  description: string;
+  best_for: string[];
+  duration_h: number;
+}
+
+export interface SymptomLog {
+  id: number;
+  ts: string;
+  symptom: string;
+  label_en: string;
+  label_hi: string;
+  red_flag: boolean;
+  source: string;
+  note: string;
+  resolved_at: string | null;
+}

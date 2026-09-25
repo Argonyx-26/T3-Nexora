@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Medication, PatientSummary, Risk, RiskPoint, Vital } from "./types";
+import type { AlertItem, Medication, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "http://127.0.0.1:8000";
 
@@ -9,10 +9,12 @@ export class ApiError extends Error {
   }
 }
 
-async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+async function request<T>(path: string, init?: RequestInit & { signal?: AbortSignal }): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { signal, headers: { Accept: "application/json" } });
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (init?.body) headers["Content-Type"] = "application/json"; // GETs stay "simple": no CORS preflight
+    res = await fetch(`${API_URL}${path}`, { ...init, headers });
   } catch (e) {
     if ((e as Error).name === "AbortError") throw e;
     throw new ApiError("Can't reach the AYU server. Is the backend running?");
@@ -24,6 +26,9 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+const get = <T,>(path: string, signal?: AbortSignal) => request<T>(path, { signal });
+const post = <T,>(path: string, body: unknown = {}) => request<T>(path, { method: "POST", body: JSON.stringify(body) });
+
 export const api = {
   patients: (s?: AbortSignal) => get<PatientSummary[]>("/patients", s),
   patient: (id: string, s?: AbortSignal) => get<PatientSummary>(`/patients/${id}`, s),
@@ -32,6 +37,20 @@ export const api = {
   vitals: (id: string, range = "6h", maxPoints = 600, s?: AbortSignal) =>
     get<Vital[]>(`/patients/${id}/vitals?range=${range}&max_points=${maxPoints}`, s),
   medications: (id: string, s?: AbortSignal) => get<Medication[]>(`/patients/${id}/medications`, s),
+  symptoms: (id: string, s?: AbortSignal) => get<SymptomLog[]>(`/patients/${id}/symptoms`, s),
+  alerts: (status = "open", s?: AbortSignal) => get<AlertItem[]>(`/alerts?status=${status}`, s),
+  ack: (id: number, note: string, by = "Doctor") => post<AlertItem>(`/alerts/${id}/ack`, { note, by }),
+  resolve: (id: number, note = "", by = "Doctor") => post<AlertItem>(`/alerts/${id}/resolve`, { note, by }),
+  reportSymptoms: (id: string, symptoms: string[], source = "patient", note = "") => post<Risk>(`/patients/${id}/symptoms`, { symptoms, source, note }),
+  recordDose: (doseId: number, status: "taken" | "missed") => post<Risk>("/doses", { dose_id: doseId, status }),
+  sim: (s?: AbortSignal) => get<SimState>("/sim", s),
+  scenarios: (s?: AbortSignal) => get<ScenarioInfo[]>("/sim/scenarios", s),
+  startScenario: (patient_id: string, scenario: string) => post<SimState>("/sim/scenario", { patient_id, scenario }),
+  setSpeed: (speed: number) => post<SimState>("/sim/speed", { speed }),
+  pause: () => post<SimState>("/sim/pause"),
+  resume: () => post<SimState>("/sim/resume"),
+  step: () => post<SimState>("/sim/step"),
+  reset: () => post<SimState>("/sim/reset"),
 };
 
 export interface Query<T> {
