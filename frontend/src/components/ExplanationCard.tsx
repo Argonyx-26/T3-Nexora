@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { Cpu, Languages, MessageSquareText, Sparkles, Stethoscope, UserRound } from "lucide-react";
 import { useState } from "react";
 import { api, useQuery } from "../lib/api";
 import { LEVEL_STYLE } from "../lib/format";
@@ -27,20 +28,22 @@ export function ExplanationCard({ patientId, level, score }: { patientId: string
     <div className="rounded-3xl border border-line bg-surface p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Eyebrow>Explanation</Eyebrow>
+          <Eyebrow icon={MessageSquareText}>Explanation</Eyebrow>
           {e && (
             <span
               className={cx(
-                "rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em]",
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em]",
                 e.source === "gemini" ? "bg-teal-soft text-teal" : "bg-surface-2 text-muted",
               )}
               title={e.source === "gemini" ? `Written by ${e.model}` : "Gemini is off or unavailable; AYU's built-in explanation"}
             >
+              {e.source === "gemini" ? <Sparkles size={11} strokeWidth={1.75} aria-hidden /> : <Cpu size={11} strokeWidth={1.75} aria-hidden />}
               {e.source === "gemini" ? `Gemini · ${e.model}` : "Built-in · offline"}
             </span>
           )}
         </div>
-        <div className="flex rounded-full border border-line p-1" role="group" aria-label="Explanation language">
+        <div className="flex items-center rounded-full border border-line p-1" role="group" aria-label="Explanation language">
+          <Languages size={14} strokeWidth={1.75} aria-hidden className="mx-2 text-muted" />
           {(["en", "hi"] as Lang[]).map((l) => (
             <button
               key={l}
@@ -76,11 +79,11 @@ export function ExplanationCard({ patientId, level, score }: { patientId: string
               className="grid gap-5 lg:grid-cols-[1.4fr_1fr]"
             >
               <div>
-                <div className="text-[12px] text-muted">{t.doctor}</div>
+                <div className="flex items-center gap-1.5 text-[12px] text-muted"><Stethoscope size={13} strokeWidth={1.75} aria-hidden />{t.doctor}</div>
                 <p className="mt-2 text-[16px] leading-relaxed text-ink">{e.doctor}</p>
               </div>
               <div className={cx("rounded-2xl p-4", LEVEL_STYLE[e.level].soft)}>
-                <div className="text-[12px] text-muted">{t.patient}</div>
+                <div className="flex items-center gap-1.5 text-[12px] text-muted"><UserRound size={13} strokeWidth={1.75} aria-hidden />{t.patient}</div>
                 <p className={cx("mt-2 text-[17px] leading-relaxed", LEVEL_STYLE[e.level].text)}>“{e.patient}”</p>
               </div>
             </motion.div>

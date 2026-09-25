@@ -1,9 +1,11 @@
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Activity, ClipboardList, History, ListChecks, Microscope, Pill, ShieldPlus, Siren, Stethoscope, Target, TrendingUp, type LucideIcon } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertCard, AlertToaster, LiveStatus } from "../components/alerts";
 import { ExplanationCard } from "../components/ExplanationCard";
+import { VITAL_ICON, ic } from "../components/icons";
 import { Shell } from "../components/Shell";
 import { VitalChart } from "../components/VitalChart";
 import { Card, EmptyState, ErrorState, Eyebrow, RiskBadge, Skeleton, cx } from "../components/ui";
@@ -147,7 +149,7 @@ export default function PatientDetail() {
         <section className="mt-14">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <Eyebrow>Vitals</Eyebrow>
+              <Eyebrow icon={Activity}>Vitals</Eyebrow>
               <h2 className="mt-2 font-display text-[36px] leading-none">Against this patient's own normal</h2>
               <p className="mt-2 text-[13px] text-muted">Shaded band: this patient's baseline ± 2.5σ. Dashed lines: where NEWS2 starts adding points.</p>
             </div>
@@ -179,7 +181,7 @@ export default function PatientDetail() {
         {/* Risk timeline + NEWS2 */}
         <section className="mt-14 grid gap-4 lg:grid-cols-[1fr_380px] [&>*]:min-w-0">
           <Card className="p-6">
-            <Eyebrow>Risk timeline · 24 h</Eyebrow>
+            <Eyebrow icon={History}>Risk timeline · 24 h</Eyebrow>
             <div className="mt-4">
               {history.error && !history.data ? (
                 <ErrorState error={history.error} onRetry={history.reload} />
@@ -215,7 +217,7 @@ export default function PatientDetail() {
         <section className="mt-14 grid gap-4 lg:grid-cols-[1fr_380px] [&>*]:min-w-0">
           <MedsCard meds={meds.data} error={meds.error} onRetry={meds.reload} adherence={r?.adherence.pct ?? null} />
           <Card className="p-6">
-            <Eyebrow>Symptom log · 7 days</Eyebrow>
+            <Eyebrow icon={ClipboardList}>Symptom log · 7 days</Eyebrow>
             <div className="mt-4">
               {symptoms.error && !symptoms.data ? (
                 <ErrorState error={symptoms.error} onRetry={symptoms.reload} />
@@ -256,7 +258,7 @@ function ActionCard({ risk }: { risk?: Risk }) {
   const s = LEVEL_STYLE[risk.level];
   return (
     <div className={cx("flex flex-col rounded-3xl p-6", s.soft)}>
-      <div className={cx("eyebrow", s.text)}>Recommended action</div>
+      <div className={cx("eyebrow flex items-center gap-2", s.text)}><Stethoscope {...ic(13)} />Recommended action</div>
       <div className={cx("mt-3 font-display text-[40px] leading-none", s.text)}>{risk.urgency}</div>
       <ul className="mt-5 space-y-2.5 text-[14px] leading-snug text-ink">
         {risk.recommended_action.map((a) => (
@@ -277,7 +279,7 @@ function FactorsCard({ risk }: { risk?: Risk }) {
   return (
     <Card className="p-6">
       <div className="flex items-baseline justify-between">
-        <Eyebrow>Why this score</Eyebrow>
+        <Eyebrow icon={ListChecks}>Why this score</Eyebrow>
         <span className="font-mono text-[12px] text-muted tnum">Σ {risk.score}</span>
       </div>
       {factors.length === 0 ? (
@@ -293,13 +295,34 @@ function FactorsCard({ risk }: { risk?: Risk }) {
   );
 }
 
+// Each kind of factor wears one icon, so a doctor can scan the list by kind.
+const FACTOR_ICON: Record<string, LucideIcon> = {
+  news2: ShieldPlus,
+  qsofa: Microscope,
+  baseline: Target,
+  trend: TrendingUp,
+  symptom: ClipboardList,
+  adherence: Pill,
+  medication: Pill,
+  escalation: Siren,
+};
+
+function VitalIcon({ vital }: { vital: VitalKey }) {
+  const Icon = VITAL_ICON[vital];
+  return <Icon {...ic(13)} className="shrink-0" />;
+}
+
 /** Waterfall row: each bar starts where the previous factor ended, so the bars add up to the score. */
 function FactorRow({ f, offset, total, i }: { f: Factor; offset: number; total: number; i: number }) {
   const escalation = f.kind === "escalation";
+  const Icon = FACTOR_ICON[f.kind] ?? Activity;
   return (
     <div>
       <div className="flex items-baseline justify-between gap-4">
-        <span className="text-[14px] font-medium">{f.headline}</span>
+        <span className="flex items-center gap-2 text-[14px] font-medium">
+          <Icon {...ic(14)} className={cx("shrink-0 self-center", escalation ? "text-critical" : "text-teal")} />
+          {f.headline}
+        </span>
         <span className="font-mono text-[13px] text-muted tnum">+{f.contribution.toFixed(1)}</span>
       </div>
       <div className="relative mt-1.5 h-2 rounded-full bg-surface-2">
@@ -333,7 +356,7 @@ function VitalPanel({ vital, risk, loading, error, children }: { vital: VitalKey
     <Card className={cx("p-5", flagged && "border-watch/40")}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="eyebrow">{meta.label}{vital === "sbp" ? " / diastolic" : ""}</div>
+          <div className="eyebrow flex items-center gap-2"><VitalIcon vital={vital} />{meta.label}{vital === "sbp" ? " / diastolic" : ""}</div>
           <div className="mt-1 flex items-baseline gap-1.5">
             <span className="font-mono text-[26px] leading-none tnum">{dev ? fmtVital(vital, dev.value) : "—"}</span>
             <span className="text-[12px] text-muted">{meta.unit}</span>
@@ -367,7 +390,7 @@ function News2Card({ risk }: { risk?: Risk }) {
   return (
     <Card className="p-6">
       <div className="flex items-baseline justify-between">
-        <Eyebrow>NEWS2 breakdown</Eyebrow>
+        <Eyebrow icon={ShieldPlus}>NEWS2 breakdown</Eyebrow>
         <span className="font-mono text-[13px] tnum">{risk.news2.total} · {risk.news2.band}</span>
       </div>
       <table className="mt-4 w-full text-[13px]">
@@ -387,7 +410,7 @@ function News2Card({ risk }: { risk?: Risk }) {
       <p className="mt-3 text-[12px] leading-relaxed text-muted">{risk.news2.response}</p>
       <div className="mt-5 border-t border-line pt-4">
         <div className="flex items-baseline justify-between">
-          <Eyebrow>qSOFA sepsis screen</Eyebrow>
+          <Eyebrow icon={Microscope}>qSOFA sepsis screen</Eyebrow>
           <span className={cx("font-mono text-[13px] tnum", q.flag ? "text-critical" : "text-muted")}>{q.score}/3{q.flag ? " · flag" : ""}</span>
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -409,7 +432,7 @@ function MedsCard({ meds, error, onRetry, adherence }: { meds?: Medication[]; er
   return (
     <Card className="p-6">
       <div className="flex items-baseline justify-between">
-        <Eyebrow>Medication adherence · 7 days</Eyebrow>
+        <Eyebrow icon={Pill}>Medication adherence · 7 days</Eyebrow>
         {adherence !== null && <span className="font-mono text-[13px] tnum">{adherence.toFixed(0)}% taken</span>}
       </div>
       {error && !meds ? (

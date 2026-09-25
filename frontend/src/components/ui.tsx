@@ -13,8 +13,14 @@ export function Card({ className, children }: { className?: string; children: Re
   return <div className={cx("rounded-2xl border border-line bg-surface", className)}>{children}</div>;
 }
 
-export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("eyebrow", className)}>{children}</div>;
+export function Eyebrow({ children, className, icon: Icon }: { children: ReactNode; className?: string; icon?: LucideIcon }) {
+  if (!Icon) return <div className={cx("eyebrow", className)}>{children}</div>;
+  return (
+    <div className={cx("eyebrow flex items-center gap-2", className)}>
+      <Icon size={13} strokeWidth={1.75} aria-hidden className="shrink-0" />
+      {children}
+    </div>
+  );
 }
 
 type ButtonProps = { children: ReactNode; variant?: "primary" | "ghost" | "quiet"; className?: string } & (
