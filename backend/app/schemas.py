@@ -128,6 +128,10 @@ class PatientOut(BaseModel):
     notes: str
     history: list[dict] = Field(default_factory=list)
     source: str = "demo"
+    hospital_id: str = "H01"
+    doctor_id: str = ""
+    assigned_reason: str = ""
+    registered_by: str = "seed"
 
 
 class PatientSummary(PatientOut):

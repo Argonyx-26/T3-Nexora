@@ -54,6 +54,9 @@ class QueueItem(BaseModel):
     name: str
     bed: str
     ward: str
+    hospital_id: str = "H01"
+    doctor_id: str = ""
+    registered_by: str = "seed"
     priority: str | None  # "Critical" | "High" | "Moderate" | None (nothing to review)
     level: str
     score: int
@@ -95,6 +98,10 @@ def _insights(patient_id: str) -> InsightsOut:
     review += [p["text"] for p in patterns if p["kind"] == "critical" or (p["kind"] == "weekday" and p.get("critical"))
                or (p["kind"] == "streak" and p["missed"] >= 3)]
     review += [m["text"] for m in mood_ch]
+    if ps.info.get("registered_by") == "self":
+        review.append("Self-registered — verify details at the first visit")
+    if not ps.info.get("doctor_id"):
+        review.append("No doctor assigned yet")
     return InsightsOut(
         patient_id=patient_id, level=risk.level, score=risk.score, confidence=conf, confidence_reasons=reasons,
         data_quality=QualityOut(**q.__dict__), sudden_changes=changes, missed_patterns=patterns,
@@ -122,6 +129,8 @@ async def ward_queue():
             a = open_alerts.get(pid)
             items.append(QueueItem(
                 patient_id=pid, name=ps.info["name"], bed=ps.info["bed"], ward=ps.info["ward"], priority=prio,
+                hospital_id=ps.info.get("hospital_id", "H01"), doctor_id=ps.info.get("doctor_id", ""),
+                registered_by=ps.info.get("registered_by", "seed"),
                 level=ins.level, score=ins.score, news2=ps.risk.news2.total, confidence=ins.confidence,
                 data_quality=ins.data_quality.label,
                 factors=[{"headline": f.headline, "kind": f.kind, "factor": f.factor, "message": f.message, "contribution": f.contribution}

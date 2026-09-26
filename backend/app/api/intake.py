@@ -19,10 +19,11 @@ from sqlmodel import Session, select
 
 from ..db import engine
 from ..intake.extract import RANGES, extract
-from ..models import DoctorNote, Medication, Patient, SymptomReport, VitalReading
+from ..models import DoctorNote, Hospital, Medication, Patient, SymptomReport, VitalReading
 from ..risk import weights as W
 from ..services.hub import hub
 from ..sim.simulator import sim
+from .network import assign
 from .patients import summary_of
 
 router = APIRouter(tags=["Intake"])
@@ -107,7 +108,9 @@ class PatientIn(BaseModel):
     history: list[dict] = Field(default_factory=list, max_length=15)
     notes: str = Field("", max_length=600)
     report_name: str = Field("", max_length=200)
-    source: Literal["pdf", "photo", "text", "manual"] = "manual"
+    source: Literal["pdf", "photo", "text", "manual", "self"] = "manual"
+    hospital_id: str = Field("H01", max_length=10)
+    consent: bool = False  # required when a patient registers themselves
 
 
 @router.post("/patients", summary="Add a patient (from a reviewed report draft or by hand); AYU scores them at once")
@@ -119,6 +122,8 @@ async def create_patient(body: PatientIn):
     unknown = [k for k in body.symptoms if k not in W.SYMPTOMS]
     if unknown:
         raise HTTPException(422, f"Unknown symptoms: {unknown}")
+    if body.source == "self" and not body.consent:
+        raise HTTPException(422, "Please agree to share your readings with your care team")
     for m in body.medications:
         if any(not re.fullmatch(r"[0-2]\d:[0-5]\d", t) for t in m.times):
             raise HTTPException(422, f"Times for {m.name} must be HH:MM")
@@ -126,6 +131,8 @@ async def create_patient(body: PatientIn):
     def save() -> str:
         sim.ensure_loaded()
         with Session(engine) as s:
+            if s.get(Hospital, body.hospital_id) is None:
+                raise HTTPException(422, f"Unknown site {body.hospital_id}")
             ids = [p.id for p in s.exec(select(Patient)).all()]
             n = max((int(i[1:]) for i in ids if re.fullmatch(r"P\d+", i)), default=0) + 1
             pid = f"P{n:03d}"
@@ -137,7 +144,8 @@ async def create_patient(body: PatientIn):
                 id=pid, name=body.name.strip(), age=body.age, sex=body.sex, conditions=body.conditions, ward=body.ward.strip() or "Intake",
                 bed=bed, language=body.language, spo2_scale=body.spo2_scale,
                 normals={k: {"mean": m, "std": sd} for k, (m, sd) in normals.items()},
-                notes=body.notes.strip(), history=body.history, source="intake",
+                notes=body.notes.strip(), history=body.history, source="intake", hospital_id=body.hospital_id,
+                registered_by="self" if body.source == "self" else "clinician",
             ))
             s.flush()
             v = body.vitals
@@ -148,14 +156,23 @@ async def create_patient(body: PatientIn):
                                  times=m.times, critical=m.critical))
             for k in dict.fromkeys(body.symptoms):
                 s.add(SymptomReport(patient_id=pid, ts=sim.now, symptom=k, source="report", note="From the admission report"))
-            how = {"pdf": "a PDF report", "photo": "a photo of a report", "text": "pasted report text", "manual": "manual entry"}[body.source]
+            how = {"pdf": "a PDF report", "photo": "a photo of a report", "text": "pasted report text", "manual": "manual entry",
+                   "self": "the patient's own registration"}[body.source]
+            checked = "entered by the patient — please verify at the first visit" if body.source == "self" else "reviewed by a clinician before saving"
             s.add(DoctorNote(patient_id=pid, ts=sim.now, author="AYU intake", kind="note", visible=False,
-                             text=f"Added from {how}{f' ({body.report_name})' if body.report_name else ''}; reviewed by a clinician before saving."))
+                             text=f"Added from {how}{f' ({body.report_name})' if body.report_name else ''}; {checked}."))
             s.commit()
         return pid
 
     pid = await asyncio.to_thread(save)
     message = await asyncio.to_thread(sim.add_patient, pid)
     await hub.broadcast(message)
+
+    def assign_now() -> None:  # with their risk known, AYU picks the doctor
+        with Session(engine) as s:
+            assign(s, s.get(Patient, pid))
+            s.commit()
+
+    await asyncio.to_thread(assign_now)
     summary = summary_of(pid)
     return {"patient": summary.model_dump(mode="json"), "patient_id": pid}

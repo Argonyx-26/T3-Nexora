@@ -169,3 +169,17 @@ DEFAULT_CHECKINS = [(4, 2, 3), (4, 3, 2), (3, 2, 2), (4, 2, 3), (4, 3, 3)]
 # Weekday → chance of missing a dose (Python weekday: Mon 0 … Sun 6), overriding `adherence` on those days.
 # Harbhajan's family calls on weekdays; at weekends his morning tablets slip.
 MISS_WEEKDAYS: dict[str, dict[int, float]] = {"P007": {5: 0.9, 6: 0.9, 0: 0.05, 1: 0.05, 2: 0.05, 3: 0.05, 4: 0.05}}
+
+# The demo network: a city hospital and a village primary health centre (fictional names and people).
+HOSPITALS = [
+    {"id": "H01", "name": "City General Hospital", "city": "Bengaluru", "kind": "hospital"},
+    {"id": "H02", "name": "Primary Health Centre, Hosahalli", "city": "Bengaluru Rural", "kind": "phc"},
+]
+DOCTORS = [
+    {"id": "D01", "name": "Dr. Meera Rao", "specialty": "General Medicine", "hospital_id": "H01"},
+    {"id": "D02", "name": "Dr. Arvind Kulkarni", "specialty": "Cardiology", "hospital_id": "H01"},
+    {"id": "D03", "name": "Dr. Sana Qureshi", "specialty": "Pulmonology", "hospital_id": "H01"},
+    {"id": "D04", "name": "Dr. Rohan Iyer", "specialty": "Surgery", "hospital_id": "H01"},
+    {"id": "D05", "name": "Dr. Kavya Menon", "specialty": "Endocrinology", "hospital_id": "H01"},
+    {"id": "D06", "name": "Dr. Prakash Gowda", "specialty": "General Medicine", "hospital_id": "H02"},
+]

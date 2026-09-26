@@ -7,6 +7,24 @@ from sqlalchemy import JSON, Column, Index
 from sqlmodel import Field, SQLModel
 
 
+class Hospital(SQLModel, table=True):
+    """One care site on the AYU network: a hospital, a primary health centre or a clinic."""
+
+    id: str = Field(primary_key=True)  # "H01"
+    name: str
+    city: str
+    kind: str = "hospital"  # "hospital" | "phc" | "clinic"
+
+
+class Doctor(SQLModel, table=True):
+    id: str = Field(primary_key=True)  # "D01"
+    name: str
+    specialty: str  # "General Medicine" | "Cardiology" | "Pulmonology" | "Endocrinology" | "Surgery" | ...
+    hospital_id: str = Field(foreign_key="hospital.id", index=True)
+    on_duty: bool = True
+    max_patients: int = 6
+
+
 class Patient(SQLModel, table=True):
     id: str = Field(primary_key=True)  # "P001"
     name: str
@@ -25,6 +43,10 @@ class Patient(SQLModel, table=True):
     # "demo": the simulated cohort (vitals stream every 5 min) · "intake": added by a clinician from a report or by hand —
     # only real readings, never simulated ones
     source: str = "demo"
+    hospital_id: str = "H01"
+    doctor_id: str = ""  # "" = not yet assigned
+    assigned_reason: str = ""
+    registered_by: str = "seed"  # "seed" | "clinician" | "self"
 
 
 class VitalReading(SQLModel, table=True):

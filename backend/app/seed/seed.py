@@ -16,9 +16,10 @@ from sqlmodel import Session, select
 
 from ..config import settings
 from ..db import create_tables, drop_tables, engine
-from ..models import DailyCheckin, DoseEvent, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
+from ..models import DailyCheckin, Doctor, DoseEvent, Hospital, Medication, Patient, RiskSnapshot, SymptomReport, VitalReading
 from ..risk import PatientContext, assess
-from .patients import CHECKINS, DEFAULT_CHECKINS, HISTORY, MISS_WEEKDAYS, PATIENTS
+from .patients import CHECKINS, DEFAULT_CHECKINS, DOCTORS, HISTORY, HOSPITALS, MISS_WEEKDAYS, PATIENTS
+from ..services.assign import DoctorLoad, pick_doctor
 from .physiology import IST, VitalGenerator
 
 STEP = timedelta(minutes=settings.minutes_per_tick)
@@ -49,8 +50,19 @@ def seed_database(start: datetime | None = None, reset: bool = True) -> datetime
     n_steps = int((start - history_start) / STEP)
 
     with Session(engine) as s:
+        for h in HOSPITALS:
+            s.add(Hospital(**h))
+        s.flush()  # hospitals before the doctors that point at them
+        for d in DOCTORS:
+            s.add(Doctor(**d))
+        s.flush()
+        loads = {d["id"]: DoctorLoad(d["id"], d["name"], d["specialty"], True, 6, []) for d in DOCTORS if d["hospital_id"] == "H01"}
         for p in PATIENTS:
+            doc, why = pick_doctor(p["conditions"], "Stable", list(loads.values()))
+            if doc:
+                doc.levels.append("Stable")
             s.add(Patient(
+                hospital_id="H01", doctor_id=doc.id if doc else "", assigned_reason=why,
                 id=p["id"], name=p["name"], age=p["age"], sex=p["sex"], conditions=p["conditions"],
                 ward=p["ward"], bed=p["bed"], language=p["language"], spo2_scale=p.get("spo2_scale", 1),
                 normals={v: {"mean": m, "std": sd} for v, (m, sd) in p["normals"].items()},

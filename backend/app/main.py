@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, func, select
 
-from .api import alerts, doctor, intake, patients, ws
+from .api import alerts, doctor, intake, network, patients, ws
 from .api import eval as eval_api
 from .api import sim as sim_api
 from .config import settings
@@ -64,6 +64,7 @@ app.add_middleware(
 
 app.include_router(patients.router)
 app.include_router(intake.router)
+app.include_router(network.router)
 app.include_router(doctor.router)
 app.include_router(alerts.router)
 app.include_router(sim_api.router)
