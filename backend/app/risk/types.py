@@ -54,6 +54,9 @@ class PatientContext:
     symptoms: list[SymptomEntry] = field(default_factory=list)
     spo2_scale: int = 1  # 2 = NEWS2 scale 2, for prescribed 88–92% targets (e.g. COPD)
     baselines: dict[str, Baseline] | None = None  # pass precomputed ones to skip the work
+    # "personal": declared normals are this patient's own (clinician-set) · "typical": a population range, used
+    # for a newly added patient until AYU has learned their own baseline from their readings
+    normals_kind: str = "personal"
 
     @property
     def now(self) -> datetime:

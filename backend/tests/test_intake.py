@@ -66,6 +66,8 @@ def test_creating_a_patient_scores_them_and_never_simulates_their_vitals(client)
     assert risk["news2"]["total"] >= 5 and risk["level"] in ("Warning", "Critical")  # NEWS2 6 → at least Warning
     assert any(a["patient_id"] == pid for a in client.get("/alerts").json())
     assert client.get(f"/patients/{pid}/insights").json()["data_quality"]["label"] == "Poor"  # one reading: AYU says so
+    heads = [f["headline"] for f in risk["factors"] if f["kind"] == "baseline"]
+    assert heads and all("typical adult range" in h for h in heads)  # no personal baseline claimed yet
 
     before = len(sim.states[pid].history)
     for _ in range(12):

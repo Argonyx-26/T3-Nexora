@@ -127,12 +127,15 @@ def assess(ctx: PatientContext) -> RiskResult:
         meta = W.VITAL_META[vital]
         weight = W.DEVIATION_WEIGHT[vital]
         side = "above" if d.z > 0 else "below"
+        typical = d.baseline.source == "declared" and ctx.normals_kind == "typical"
+        ref_short = "the typical adult range" if typical else "personal baseline"
+        ref_long = "the typical adult value" if typical else "this patient's baseline"
         dev_factors.append(Factor(
             factor=f"{vital}_baseline", kind="baseline",
-            headline=f"{meta['short']} {side} personal baseline",
+            headline=f"{meta['short']} {side} {ref_short}",
             message=(
                 f"{meta['label']} {with_unit(vital, fmt(vital, d.value))} is {with_unit(vital, fmt(vital, abs(d.value - d.baseline.mean)))} "
-                f"{side} this patient's baseline of {with_unit(vital, fmt(vital, d.baseline.mean))} (z {d.z:+.1f})."
+                f"{side} {ref_long} of {with_unit(vital, fmt(vital, d.baseline.mean))} (z {d.z:+.1f})."
                 + _news2_note(vital, n2.parameters)
             ),
             value=round(d.value, 2), baseline=round(d.baseline.mean, 2), weight=weight,

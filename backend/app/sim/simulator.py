@@ -234,6 +234,7 @@ class Simulator:
             symptoms=[SymptomEntry(x.ts, x.key) for x in ps.symptoms if x.ts <= now],
             spo2_scale=ps.info["spo2_scale"],
             baselines=ps.baselines,
+            normals_kind="personal" if ps.live else "typical",
         )
 
     def _offsets(self, ps: PState) -> tuple[dict[str, float], dict[str, float]]:
