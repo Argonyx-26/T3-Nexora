@@ -167,6 +167,10 @@ class Simulator:
             .where(VitalReading.patient_id == p.id, VitalReading.ts >= since)
             .order_by(col(VitalReading.ts))
         ).all()
+        if not rows:  # a real patient's last reading can be older than the window; it is still their latest
+            rows = s.exec(
+                select(VitalReading).where(VitalReading.patient_id == p.id).order_by(col(VitalReading.ts).desc()).limit(1)
+            ).all()
         history = deque(
             Reading(ts=r.ts, hr=r.hr, spo2=r.spo2, sbp=r.sbp, dbp=r.dbp, rr=r.rr, temp=r.temp,
                     glucose=r.glucose, on_oxygen=r.on_oxygen, consciousness=r.consciousness)

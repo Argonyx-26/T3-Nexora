@@ -93,3 +93,22 @@ def test_an_iphone_photo_with_no_type_is_recognised_by_its_extension(client):
     heic = base64.b64encode(b"\x00\x00\x00\x18ftypheic" + b"0" * 64).decode()
     r = client.post("/intake/extract", json={"filename": "IMG_2041.HEIC", "mime": "", "data_base64": heic})
     assert r.status_code == 200 and "Gemini" in r.json()["message"]  # accepted as a photo (read needs Gemini in tests)
+
+
+def test_a_real_patient_whose_only_reading_has_aged_out_still_loads(client):
+    from sqlmodel import Session
+
+    from app.db import engine
+    from app.models import Patient
+    from app.sim.simulator import HISTORY_KEEP
+
+    base = {"name": "Old Report", "age": 50, "sex": "M", "vitals": {"hr": 80, "spo2": 97, "sbp": 120, "dbp": 80, "rr": 16, "temp": 36.8}}
+    pid = client.post("/patients", json=base).json()["patient_id"]
+    now = sim.now
+    try:
+        sim.now = now + HISTORY_KEEP * 2  # the ward clock has moved on for days; nothing new for this patient
+        with Session(engine) as s:
+            ps = sim._load_patient(s, s.get(Patient, pid))
+        assert len(ps.history) == 1 and ps.risk is not None  # their last reading is used, not a crash on startup
+    finally:
+        sim.now = now
