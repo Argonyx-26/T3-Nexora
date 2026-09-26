@@ -170,3 +170,44 @@ async def set_duty(doctor_id: str, body: DutyIn):
     for m in out["handed_over"]:
         await hub.broadcast(sim.reassess(m["patient_id"]))
     return out
+
+
+class ReferIn(BaseModel):
+    hospital_id: str
+    reason: str = ""
+    by: str = "Doctor"
+
+
+@router.post("/patients/{patient_id}/refer", summary="Refer a patient to another site; their whole record goes with them")
+async def refer(patient_id: str, body: ReferIn):
+    """Move a patient to another site on the network (e.g. a PHC → the district hospital). Their readings,
+    medicines, symptoms, notes and alerts stay attached; AYU assigns a doctor there by the same rule."""
+
+    def run():
+        with Session(engine) as s:
+            p = s.get(Patient, patient_id)
+            if p is None:
+                raise HTTPException(404, f"No patient {patient_id}")
+            dest = s.get(Hospital, body.hospital_id)
+            if dest is None:
+                raise HTTPException(422, f"Unknown site {body.hospital_id}")
+            if p.hospital_id == dest.id:
+                raise HTTPException(409, f"{p.name} is already at {dest.name}")
+            src = s.get(Hospital, p.hospital_id)
+            p.hospital_id, p.doctor_id = dest.id, ""
+            p.ward = "Referral" if dest.kind == "hospital" else dest.name
+            s.add(p)
+            s.flush()
+            doctor_id, reason = assign(s, p)
+            why = f" Reason: {body.reason.strip()}" if body.reason.strip() else ""
+            s.add(DoctorNote(patient_id=p.id, ts=sim.now, author=body.by, kind="note", visible=True,
+                             text=f"Referred from {src.name if src else 'the previous site'} to {dest.name}.{why}"))
+            s.commit()
+            ps = sim.get(p.id)
+            if ps:
+                ps.info.update(ward=p.ward)
+            return {"patient_id": p.id, "from": src.id if src else "", "to": dest.id, "doctor_id": doctor_id, "reason": reason}
+
+    out = await asyncio.to_thread(run)
+    await hub.broadcast(sim.reassess(patient_id))
+    return out

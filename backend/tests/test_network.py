@@ -65,3 +65,20 @@ def test_a_patient_can_register_themselves_at_a_phc(client):
     q = next(x for x in client.get("/insights").json() if x["patient_id"] == p["id"])
     assert any("Self-registered" in t for t in q["needs_review"]) and q["hospital_id"] == "H02"
     assert client.post("/patients", json={**body, "consent": True, "hospital_id": "H99"}).status_code == 422
+
+
+def test_referral_moves_the_patient_and_their_record_to_the_hospital(client):
+    body = {"name": "Lalitha Bai", "age": 58, "sex": "F", "conditions": ["Heart failure"], "source": "self", "consent": True,
+            "hospital_id": "H02", "vitals": {"hr": 118, "spo2": 91, "sbp": 96, "dbp": 60, "rr": 26, "temp": 37.9}}
+    pid = client.post("/patients", json=body).json()["patient_id"]
+    assert client.get(f"/patients/{pid}").json()["doctor_id"] == "D06"
+    r = client.post(f"/patients/{pid}/refer", json={"hospital_id": "H01", "reason": "Needs cardiology review", "by": "Dr. Prakash Gowda"})
+    assert r.status_code == 200, r.text
+    assert r.json()["doctor_id"] == "D02"  # cardiology at the hospital
+    p = client.get(f"/patients/{pid}").json()
+    assert p["hospital_id"] == "H01" and p["doctor_id"] == "D02"
+    assert len(client.get(f"/patients/{pid}/vitals?range=24h").json()) >= 1  # the record came along
+    notes = [n["text"] for n in client.get(f"/patients/{pid}/notes").json()]
+    assert any("Referred from Primary Health Centre" in t and "cardiology" in t for t in notes)
+    assert client.post(f"/patients/{pid}/refer", json={"hospital_id": "H01"}).status_code == 409
+    assert client.post(f"/patients/{pid}/refer", json={"hospital_id": "H99"}).status_code == 422
