@@ -234,7 +234,7 @@ function DropZone({ file, preview, onPick }: { file: File | null; preview: strin
       className={cx("mt-5 grid min-h-[220px] cursor-pointer place-items-center rounded-3xl border-2 border-dashed p-8 text-center transition-colors",
         over ? "border-teal bg-teal-soft" : "border-line-2 bg-surface hover:border-teal/60")}
     >
-      <input ref={input} type="file" accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden"
+      <input ref={input} type="file" accept="application/pdf,image/*,.heic,.heif" className="hidden"
         onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
       {file ? (
         <div className="flex flex-col items-center gap-3">
@@ -249,7 +249,7 @@ function DropZone({ file, preview, onPick }: { file: File | null; preview: strin
             <FileScan size={30} aria-hidden />
           </motion.span>
           <div className="text-[16px] font-medium">Drop a report here, or click to choose</div>
-          <div className="flex items-center gap-3 text-[12px] text-muted"><span className="inline-flex items-center gap-1"><FileText size={13} aria-hidden />PDF</span><span className="inline-flex items-center gap-1"><ImageIcon size={13} aria-hidden />PNG · JPG · WEBP</span><span>up to 8 MB</span></div>
+          <div className="flex items-center gap-3 text-[12px] text-muted"><span className="inline-flex items-center gap-1"><FileText size={13} aria-hidden />PDF</span><span className="inline-flex items-center gap-1"><ImageIcon size={13} aria-hidden />JPG · PNG · HEIC (iPhone)</span><span>up to 8 MB</span></div>
         </div>
       )}
     </div>

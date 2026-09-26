@@ -87,3 +87,9 @@ def test_create_validates(client):
     assert client.post("/patients", json={**base, "symptoms": ["zombie"]}).status_code == 422
     assert client.post("/patients", json={**base, "medications": [{"name": "A", "times": ["8am"]}]}).status_code == 422
     assert client.post("/patients", json={k: v for k, v in base.items() if k != "vitals"}).status_code == 422
+
+
+def test_an_iphone_photo_with_no_type_is_recognised_by_its_extension(client):
+    heic = base64.b64encode(b"\x00\x00\x00\x18ftypheic" + b"0" * 64).decode()
+    r = client.post("/intake/extract", json={"filename": "IMG_2041.HEIC", "mime": "", "data_base64": heic})
+    assert r.status_code == 200 and "Gemini" in r.json()["message"]  # accepted as a photo (read needs Gemini in tests)

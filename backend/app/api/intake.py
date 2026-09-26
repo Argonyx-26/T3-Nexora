@@ -29,7 +29,10 @@ from .patients import summary_of
 router = APIRouter(tags=["Intake"])
 
 MAX_BYTES = 8 * 1024 * 1024
-ALLOWED = {"application/pdf", "image/png", "image/jpeg", "image/webp", "image/heic", "text/plain"}
+ALLOWED = {"application/pdf", "image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "text/plain"}
+# Browsers often send no type for iPhone photos (HEIC) — fall back to the file's extension.
+BY_EXTENSION = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+                ".heic": "image/heic", ".heif": "image/heif", ".txt": "text/plain"}
 # Population normals, used until AYU has learned this patient's own (it needs a day of readings).
 DEFAULT_NORMALS = {"hr": (76, 9), "spo2": (97, 1.3), "sbp": (122, 10), "dbp": (78, 7), "rr": (15, 2), "temp": (36.8, 0.3), "glucose": (115, 18)}
 
@@ -61,8 +64,11 @@ async def extract_report(body: ExtractIn):
             raise HTTPException(422, "The file could not be decoded")
         if len(data) > MAX_BYTES:
             raise HTTPException(413, "Reports up to 8 MB, please")
-        if not mime and body.filename.lower().endswith(".pdf"):
-            mime = "application/pdf"
+        if mime in ("", "application/octet-stream"):
+            ext = "." + body.filename.lower().rsplit(".", 1)[-1] if "." in body.filename else ""
+            mime = BY_EXTENSION.get(ext, mime)
+        if mime == "image/jpg":
+            mime = "image/jpeg"
         if mime not in ALLOWED:
             raise HTTPException(415, "Upload a PDF or a photo (PNG, JPG, WEBP)")
         if mime == "text/plain":
