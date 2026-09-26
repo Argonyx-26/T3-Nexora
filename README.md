@@ -4,39 +4,67 @@
 
 **Team AYU · Argonyx'26, RV University** — Ishan Sharma (lead), Aryan Verma, Harshit Kandpal, Vinay
 
-> Hospitals use NEWS2, which applies the same thresholds to everyone. AYU adds a **personal baseline** for each
-> patient plus **trend detection**, so it catches deterioration earlier — and it explains every alert in plain language.
+> Hospitals use NEWS2, which applies the same thresholds to everyone. AYU adds each patient's **personal baseline**
+> and their **trend**, so it catches deterioration earlier — explains every alert in English or हिंदी — and takes in
+> **real patient data** from reports, photos, patients themselves and ASHA workers, across a **network** of hospitals and PHCs.
 
 > ⚠️ **AYU is decision support, not diagnosis. Final clinical judgment rests with the doctor.**
 
+📘 **How everything is built — every tool, algorithm and design choice:** [`docs/TECHNICAL.md`](docs/TECHNICAL.md)
+
+![The AYU landing page](docs/screenshots/landing.jpg)
+
 ## The problem
 
-Early warning scores like NEWS2 compare every patient with the same fixed thresholds. That fails in two directions:
+Early warning scores like NEWS2 compare every patient with the same fixed thresholds. That fails in three ways:
 
-- **Slow deterioration hides inside "normal".** SpO₂ sliding from 97% to 94% over three hours scores almost nothing,
-  and a runner whose resting heart rate is 52 can reach 85 before NEWS2 notices anything.
-- **Some patients live on the thresholds.** A heart-failure or COPD patient's usual readings trip alarms on a quiet day,
-  and staff learn to ignore them.
-
-Missed doses of critical medicines (insulin, antihypertensives) and reported symptoms are not part of NEWS2 at all.
+- **Slow deterioration hides inside "normal".** SpO₂ sliding from 97% to 93% over three hours still scores *Low*, and a
+  runner whose resting heart rate is 52 can reach 85 before NEWS2 notices anything.
+- **Some patients live on the thresholds.** A heart-failure or COPD patient trips alarms on a quiet day, and staff learn
+  to ignore them.
+- **It is blind to medicines and symptoms.** Missed insulin, a missed blood-pressure tablet or chest pain are not part
+  of NEWS2 at all.
 
 ## What AYU does
 
-- **Watches** vitals every five minutes, plus symptoms and medication adherence, for every patient on a live ward.
-- **Scores risk 0–100** from NEWS2, a qSOFA sepsis screen, the patient's **own 7-day baseline**, a **3-hour trend**,
-  missed critical doses and red-flag symptoms. Every point is a named factor, and the factors add up to the score.
-- **Never less alarming than NEWS2:** escalation floors lift AYU to at least the level NEWS2 would.
-- **Alerts** doctors on a dashboard sorted by risk, with a toast and a chime. An alert escalates in place instead of
-  spamming, and a single odd reading can't raise one.
-- **Explains** each score in 2–3 sentences for the doctor and one for the patient, in **English or हिंदी**
-  (Gemini, with an instant offline fallback).
-- **Reaches patients** through a portal where they, or an **ASHA worker** on a shared phone, log readings, symptoms and
-  doses.
+**Early warning, explained**
+- Scores every patient **0–100** from NEWS2, a qSOFA sepsis screen, the patient's **own 7-day baseline**, a **3-hour
+  trend**, missed critical doses and symptoms. Every point is a named factor; the factors add up to the score.
+- **Never less alarming than NEWS2** — escalation floors lift AYU to at least NEWS2's level.
+- **Alerts** once, escalating in place (no spam); a single odd reading can't raise one.
+- **Explains** every score for the doctor and the patient, in **English or हिंदी**, via Gemini with an instant offline fallback.
+
+**Real data in — not just a simulation**
+- **Upload a report:** a PDF, a **photo of a handwritten slip** (JPG/PNG/HEIC) or pasted text. Gemini reads it into a
+  draft in ~3 s (offline, AYU reads PDFs and text itself); the clinician checks every value and adds the patient.
+- **Patients register themselves** (`/register`, English/हिंदी) — with tap-along pulse and breathing counters, a
+  report reader and consent — or join by **scanning a QR code** on the ward screen.
+- **ASHA workers** record readings, symptoms and doses for patients on a shared phone.
+- A patient added this way is **never simulated**: their risk comes only from real readings, and AYU says when data is thin.
+
+**For the doctor**
+- A live **ward** (cards or a records table) and an **AI risk & smart-alert command center** ranking Critical → High →
+  Moderate, each with a **confidence** indicator, **data quality**, the main factors and any sudden vital change.
+- A tabbed patient profile: **Overview** (recent changes, mood & wellbeing, medical history), **Trends** (24 h / 7 d /
+  30 d with zoom and the personal baseline), **Medications** (calendar, adherence, **missed-dose patterns** by time and
+  weekday), a **longitudinal timeline**, and **Notes & care** (patient-visible or private notes, follow-ups,
+  appointments, **video consults**).
+
+**For the patient**
+- A health dashboard: a glowing heart that follows their trends, an AI summary (never a diagnosis) with a **Listen / सुनें**
+  button, vitals and adherence, prescriptions and doses, weather-aware wellness tips, a daily check-in, a symptom tracker,
+  smart alerts in plain words, their care team's status, a personal timeline, and an **"Ask AYU"** assistant that sends
+  red flags straight to "call a nurse / 108".
+
+**A network, not one hospital**
+- Hospitals and PHCs on one AYU. Each patient is **assigned a doctor** by a transparent rule (specialty, then
+  acuity-weighted load), with the reason in words. Doctors can reassign; a doctor going **off duty hands patients over**
+  automatically; a patient can be **referred** PHC → hospital with their whole record.
 
 ## Results
 
 `/evaluation` runs every deterioration scenario on the patients it suits over 5 seeds (55 runs, 8 hours each), and every
-patient at rest for 50 patient-days. It compares like with like on two tiers:
+patient at rest for 50 patient-days, comparing like with like on two tiers:
 
 | | Urgent review — NEWS2 ≥ 5 vs AYU Warning | First alert — NEWS2 ≥ 5 or a single 3 vs AYU Watch (confirmed) |
 |---|---|---|
@@ -53,214 +81,111 @@ patient at rest for 50 patient-days. It compares like with like on two tiers:
 | Cardiac event | 2.8 h | 1.5 h | 75 min |
 | Missed medication | 6.2 h (never in 6/10) | 2.5 h | 4.1 h |
 
-AYU can never be later than NEWS2 at the urgent tier, by construction; ties are reported rather than hidden. Where
-NEWS2 is first on the looser first-alert tier, it is single noisy readings on patients whose normal sits on its
-thresholds — the same patients where it also raises false alarms at rest.
 **Synthetic data, not clinical validation.** Reproduce with `GET /eval/lead-time` or
-[`backend/app/eval/leadtime.py`](backend/app/eval/leadtime.py).
+[`backend/app/eval/leadtime.py`](backend/app/eval/leadtime.py). Method in [`docs/TECHNICAL.md`](docs/TECHNICAL.md#7-evaluation).
 
 ## Screenshots
 
-| Screen | Route | Screenshot |
-|---|---|---|
-| Landing — live ECG canvas and scroll story | `/` | _to add: `docs/screenshots/landing.png`_ |
-| Ward dashboard with alerts | `/doctor` | _to add: `docs/screenshots/ward.png`_ |
-| Patient detail — baseline-banded charts, explanation | `/patients/P003` | _to add: `docs/screenshots/patient.png`_ |
-| Evaluation — the proof | `/evaluation` | _to add: `docs/screenshots/evaluation.png`_ |
-| Patient portal, Hindi, ASHA mode | `/patient/P005` | _to add: `docs/screenshots/portal.png`_ |
-| Demo control panel | `/demo` | _to add: `docs/screenshots/demo.png`_ |
+| | |
+|---|---|
+| **Ward** — live, sorted by risk, with alerts ![Ward](docs/screenshots/ward.jpg) | **Command center** — prioritised queue with confidence and data quality ![Command center](docs/screenshots/command-center.jpg) |
+| **Patient profile** — score, factors, care team ![Patient](docs/screenshots/patient.jpg) | **Trends** — 24 h / 7 d / 30 d against the personal baseline ![Trends](docs/screenshots/trends.jpg) |
+| **Medications** — calendar and missed-dose patterns ![Medications](docs/screenshots/medications.jpg) | **Network** — sites, doctors, load, on/off duty ![Network](docs/screenshots/network.jpg) |
+| **Report intake** — fields found in the report are tagged ![Intake](docs/screenshots/intake-review.jpg) | **Analysed at once** — level, NEWS2, factors, alert ![Analysed](docs/screenshots/intake-analysed.jpg) |
+| **Patient dashboard** ![Patient dashboard](docs/screenshots/patient-dashboard.jpg) | **Evaluation** — the proof ![Evaluation](docs/screenshots/evaluation.jpg) |
 
-## Architecture
-
-```mermaid
-flowchart LR
-  subgraph Browser["Frontend · React + Vite"]
-    Ward["Ward dashboard"]
-    Detail["Patient detail"]
-    Portal["Patient portal"]
-    Eval["Evaluation"]
-    Demo["Demo panel"]
-  end
-
-  subgraph Server["Backend · FastAPI"]
-    API["REST API"]
-    WS["WebSocket /ws/live"]
-    Sim["Live simulator<br/>scenarios · alert rules"]
-    Engine["Risk engine<br/>NEWS2 · qSOFA · baseline · trend<br/>adherence · symptoms"]
-    Explain["Explainer"]
-    Templates["Built-in EN / HI"]
-    Evaluator["Lead-time evaluation"]
-  end
-
-  DB[("SQLite")]
-  Gemini["Gemini API"]
-
-  Sim -->|every tick| Engine
-  Sim -->|readings, risk, alerts| DB
-  Sim -->|tick, new alerts| WS
-  WS --> Ward
-  WS --> Detail
-  Portal -->|readings, symptoms, doses| API
-  Ward -->|ack or resolve| API
-  Demo -->|scenario, speed, reset| API
-  API --> Sim
-  API --> DB
-  Detail --> API
-  API --> Explain
-  Explain -->|factors only, 4 s timeout| Gemini
-  Explain -.->|fallback| Templates
-  Eval --> API
-  API --> Evaluator
-  Evaluator --> Engine
-```
-
-- **One engine everywhere.** The live ward, the portal, the explanations and the evaluation all call the same pure
-  function, `risk.assess()`, so what the judges see live is what the evaluation measured.
-- **Offline-first.** No external service is needed to run the demo; Gemini only improves the wording.
-
-## How the risk engine works
-
-`backend/app/risk/` is pure Python — no database, no web framework — and every tunable number lives in
-[`weights.py`](backend/app/risk/weights.py).
-
-| # | Component | What it does |
-|---|-----------|--------------|
-| 1 | **NEWS2** | Official RCP chart (below). Scale 2 SpO₂ for patients with a prescribed 88–92% target (COPD). |
-| 2 | **qSOFA** | RR ≥ 22, SBP ≤ 100, altered mentation; ≥ 2 → sepsis-risk flag. |
-| 3 | **Personal baseline** | Median and MAD-σ of the last 7 days, **excluding the last 6 h** so a slow decline can't teach itself "normal". Flags \|z\| ≥ 2.5 or ≥ 20% change, in the concerning direction only. |
-| 4 | **Trend** | Least-squares slope over the last 3 h. Flagged when steep enough *and* ≥ 3 standard errors from zero, with the error widened for autocorrelation — so noise can't fake a trend. |
-| 5 | **Medication** | 7-day adherence %, plus missed *critical* doses (insulin, antihypertensives, anticoagulants) in the last 24 h. |
-| 6 | **Symptoms** | Weighted red flags; chest pain, one-sided weakness, slurred speech, fainting, new confusion and coughing blood escalate at once. |
-| 7 | **Score** | 0–100 → Stable (0–24) · Watch (25–49) · Warning (50–74) · Critical (75+). Each group is capped; escalation floors mean AYU is never *less* alarming than NEWS2. Every point is a named **contributing factor**. |
-
-### NEWS2 chart
-
-| Parameter | 3 | 2 | 1 | 0 | 1 | 2 | 3 |
-|---|---|---|---|---|---|---|---|
-| Resp. rate | ≤ 8 | | 9–11 | 12–20 | | 21–24 | ≥ 25 |
-| SpO₂ scale 1 | ≤ 91 | 92–93 | 94–95 | ≥ 96 | | | |
-| Air or oxygen | | Oxygen | | Air | | | |
-| Temperature °C | ≤ 35.0 | | 35.1–36.0 | 36.1–38.0 | 38.1–39.0 | ≥ 39.1 | |
-| Systolic BP | ≤ 90 | 91–100 | 101–110 | 111–219 | | | ≥ 220 |
-| Heart rate | ≤ 40 | | 41–50 | 51–90 | 91–110 | 111–130 | ≥ 131 |
-| Consciousness | | | | Alert | | | New confusion / V / P / U |
-
-Bands: 0–4 Low (any single 3 → Low-Medium, urgent ward review) · 5–6 Medium · ≥ 7 High.
-
-## Live ward and alerts
-
-Every 2 s at 1× (5× and 20× available), each patient gets a new reading worth 5 simulated minutes, is re-scored,
-and the update is pushed over **WebSocket `/ws/live`**.
-
-- **Scenarios:** `sepsis`, `hypoxia`, `hypertensive_crisis`, `cardiac`, `missed_meds`, `recover` — steady per-hour
-  changes to vitals plus timed events (a reported symptom, new confusion, missed critical doses).
-- **Alert rules:** a rise to Warning or Critical alerts at once; a rise to Watch must still hold on the next reading.
-  A further rise escalates the *same* alert. The level drops only after 3 lower readings, so a boundary score can't
-  flap, and a resolved patient can't re-alert at the same level for 30 simulated minutes.
-  States: new → acknowledged → resolved, with the doctor's note.
-- **Demo control panel:** `/demo` — pick a patient, inject a scenario, set 1× / 5× / 20×, pause, step, reset.
-
-**Before going on stage:** open `/demo` and press **Reset** — a fresh 7-day history, no alerts, 1× speed.
-
-## Explanations
-
-- **Gemini** writes them when `GEMINI_API_KEY` is set in `.env` (model from `GEMINI_MODEL`). The system prompt forbids
-  diagnosis, requires an urgency consistent with AYU's, and asks for JSON only.
-- **Privacy boundary:** Gemini receives the score, level, urgency and contributing factors only — never a name, age,
-  bed or ID (covered by a test).
-- **Never blocks the demo:** each call is capped at `GEMINI_TIMEOUT_S` (4 s); a reply that isn't valid JSON (or isn't
-  in Devanagari when Hindi was asked for) is discarded; after any failure Gemini is skipped for 60 s. In every one of
-  those cases AYU's built-in explanation answers instantly, and the card says which one you are reading.
-- The built-in Hindi is generated from each factor's structured data (vital, value, baseline, slope, medicine,
-  symptom), not machine-translated.
-
-## Patient portal
-
-`/patient` → pick a name. A plain-language status from the live explanation, the latest readings, today's medicines
-with **Mark as taken**, **Log a reading** (temperature in °C or °F), and a **symptom checklist** in English or Hindi
-where a red-flag symptom tells the patient to call a nurse at once. **ASHA worker mode** records every entry with
-source `asha`. Anything submitted re-scores the patient immediately and reaches the doctor's dashboard live.
+<p align="center"><img src="docs/screenshots/register-mobile.jpg" alt="Self-registration on a phone" width="260"> &nbsp; <img src="docs/screenshots/handwritten-slip-sample.jpg" alt="A handwritten OPD slip AYU can read" width="420"></p>
 
 ## Quick start
 
 ```bash
-./run.sh          # macOS / Linux  (Windows: run.bat)
+./run.sh          # development: API on :8000, app with hot reload on :5173   (Windows: run.bat)
+./serve.sh        # production build: app + API together on http://localhost:8000
 ```
 
-- Dashboard: **http://localhost:5173** · Demo panel: **/demo** · Evaluation: **/evaluation**
-- API: http://127.0.0.1:8000 — interactive docs at **http://127.0.0.1:8000/docs**
 - First start creates `backend/.venv` (Python 3.11, via `uv` if installed), copies `.env.example` → `.env`, seeds a
-  demo database of 10 patients with 7 days of 5-minute vitals, and installs the frontend (Node 18+).
-- Works fully offline; `GEMINI_API_KEY` is optional.
+  demo network (2 sites, 6 doctors, 10 patients with 7 days of 5-minute vitals) and installs the frontend (Node 18+).
+- Works fully offline. Add `GEMINI_API_KEY` to `.env` for Gemini explanations, the assistant and photo reading.
+- Routes: `/` landing · `/doctor` ward · `/command` command center · `/network` · `/intake` add a patient ·
+  `/patients/:id` profile · `/patient` patient portal · `/register` self-registration · `/evaluation` · `/demo` stage controls
+- API docs: **http://localhost:8000/docs**
+
+**A public link** (for phones and the QR code), with the app served by `./serve.sh`:
 
 ```bash
-cd backend && .venv/bin/pytest            # 178 tests: engine, simulator, API, explanations, evaluation
+cloudflared tunnel --url http://localhost:8000
+```
+
+**Deploy as one container:** `docker build -t ayu . && docker run -p 8000:8000 --env-file .env ayu`, or connect the
+repo to Render — [`render.yaml`](render.yaml) is included (paste `GEMINI_API_KEY` in the dashboard).
+
+**Before going on stage:** open `/demo` and press **Reset** — fresh history, no alerts, 1× speed, whole-network view.
+
+```bash
+cd backend && .venv/bin/pytest            # 214 tests
 cd frontend && npm run build              # typecheck + production build
-cd backend && .venv/bin/python -m app.seed.seed   # re-seed and print each patient's current risk
+cd backend && .venv/bin/python -m app.seed.seed          # re-seed and print each patient's risk
+cd backend && .venv/bin/python -m app.intake.pdfmake     # regenerate samples/sample-admission-report.pdf
 ```
 
 | Setting (`.env`) | Default | What |
 |---|---|---|
-| `GEMINI_API_KEY` | empty | Enables Gemini explanations; without it the built-in ones are used |
-| `GEMINI_MODEL` · `GEMINI_TIMEOUT_S` | `gemini-2.5-flash` · `4` | Model and hard timeout |
+| `GEMINI_API_KEY` | empty | Enables Gemini; without it AYU's built-in explanations, answers and PDF/text reader are used |
+| `GEMINI_MODEL` · `GEMINI_FALLBACK_MODELS` | `gemini-3.1-flash-lite` · `gemini-3.6-flash,gemini-3.7-flash` | Text (explanations, assistant), tried in order |
+| `GEMINI_VISION_MODEL` · `GEMINI_VISION_FALLBACK_MODELS` | `gemini-3.1-flash-lite` · `gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash` | Reports and photos, tried in order |
+| `GEMINI_TIMEOUT_S` | `6` | AYU's wait per call before its own answer takes over |
 | `SIM_TICK_SECONDS` · `SIM_MINUTES_PER_TICK` | `2` · `5` | Live ward pace at 1× |
-| `AYU_SEED` · `AYU_HISTORY_DAYS` | `42` · `7` | Deterministic demo data |
-| `AYU_EVAL_SEEDS` | `5` | Seeds per scenario in the evaluation |
-| `VITE_API_URL` | `http://127.0.0.1:8000` | Where the frontend finds the API |
+| `AYU_SEED` · `AYU_HISTORY_DAYS` · `AYU_EVAL_SEEDS` | `42` · `7` · `5` | Deterministic demo data and evaluation |
+| `VITE_API_URL` | `http://127.0.0.1:8000` in dev | Where the app finds the API (a production build uses its own origin) |
 
-## API
+## API (43 REST endpoints + a WebSocket — full list at `/docs`)
 
-| Method | Path | What |
-|---|---|---|
-| GET | `/patients`, `/patients/{id}` | Live list (highest risk first) and one patient |
-| GET | `/patients/{id}/risk` | Full explainable assessment |
-| GET | `/patients/{id}/vitals?range=6h` · `/risk/history` · `/medications` · `/symptoms` | History |
-| GET | `/patients/{id}/explanation?lang=en\|hi` | Explanation for doctor and patient |
-| POST | `/patients/{id}/vitals` · `/patients/{id}/symptoms` | Hand-entered reading or symptoms; re-scored at once |
-| POST | `/doses` | Mark a dose taken or missed |
-| GET | `/alerts?status=open` | Alerts |
-| POST | `/alerts/{id}/ack` · `/alerts/{id}/resolve` | With the doctor's note |
-| GET | `/eval/lead-time` | The evaluation |
-| GET/POST | `/sim`, `/sim/scenarios`, `/sim/scenario`, `/sim/speed`, `/sim/pause`, `/sim/resume`, `/sim/step`, `/sim/reset` | Demo controls |
-| WS | `/ws/live` | Snapshot on connect, then every tick, alert and control change |
+| Area | Endpoints |
+|---|---|
+| Patients & risk | `GET /patients` · `GET /patients/{id}` · `/risk` · `/risk/history` · `/vitals` · `/medications` · `/symptoms` · `/explanation?lang=en\|hi` |
+| Patient input | `POST /patients/{id}/vitals` · `/symptoms` (severity, duration, frequency) · `/checkins` · `/chat` · `POST /doses` |
+| Intake | `POST /intake/extract` (PDF / photo / text → draft) · `POST /patients` (create; clinician or self-registration) |
+| Doctor | `GET /insights` (review queue) · `/patients/{id}/insights` · `/timeline` · `/notes` · `/appointments` · `POST /appointments/{id}` |
+| Alerts | `GET /alerts` · `POST /alerts/{id}/ack` · `/resolve` |
+| Network | `GET /hospitals` · `GET /doctors` · `POST /patients/{id}/assign` · `/refer` · `POST /doctors/{id}/duty` |
+| Evaluation & demo | `GET /eval/lead-time` · `/sim` · `/sim/scenario` · `/speed` · `/pause` · `/resume` · `/step` · `/reset` · `WS /ws/live` · `GET /health` |
 
 ## Project layout
 
 ```
 backend/app/
-  risk/       the engine (weights.py, news2, qsofa, baseline, trend, adherence, symptoms, engine)
-  explain/    built-in English/Hindi explanations + Gemini with timeout and fallback
-  eval/       lead-time evaluation against threshold-only NEWS2
+  risk/       the engine: weights.py (every number), news2, qsofa, baseline, trend, adherence, symptoms, engine
+  explain/    gemini.py (model chain), service.py (explanations), assistant.py (chat), templates.py (built-in EN/HI)
+  intake/     extract.py (report reader: Gemini or built-in rules), pdfmake.py (sample report)
+  services/   insights (confidence, data quality, sudden changes, patterns), assign (doctor assignment), context, hub
   sim/        live simulator + scenarios (alert rules, hysteresis, cooldown, dose schedule)
-  seed/       demo cohort + vitals generator
-  services/   database ↔ engine glue, WebSocket hub
-  api/        REST + WebSocket routers
-backend/tests/  pytest suite
+  eval/       lead-time evaluation against threshold-only NEWS2
+  seed/       demo network: sites, doctors, patients, history, check-ins
+  api/        patients, intake, doctor, network, alerts, sim, eval, ws
+backend/tests/   214 tests
 frontend/src/
-  pages/        Landing, Doctor (ward), PatientDetail, PatientPortal, Evaluation, Demo
-  components/   VitalField (hero canvas), HeroMonitor, charts, alerts, explanation, motion kit, UI
-  lib/          API client, live WebSocket store, types, formatting, theme
+  pages/       Landing, Doctor (ward), CommandCenter, Network, Intake, PatientDetail, PatientPortal, Register, Evaluation, Demo
+  components/  DoctorKit, PatientDashboard, PatientCare, NetworkKit, alerts, charts, VitalField (hero), HospitalStory,
+               Buddy (mascot), Logo, Speak, InviteQR, illustrations, UI kit
+  lib/         api client, live WebSocket store, scope (site/doctor), types, formatting, theme
+docs/          TECHNICAL.md, screenshots
+samples/       a synthetic admission report (PDF) for the offline demo
 ```
 
-## Engineering notes
+## Honest limits
 
-- **Trends that noise can't fake.** A plain 2-hour slope flagged "trends" in ~20% of checks on resting patients,
-  because readings minutes apart are correlated. A 3-hour window with the slope's error widened for residual
-  autocorrelation brought that to ~0.1%, while a 1%/hr SpO₂ fall is still caught every time.
-- **No flapping, no spam.** The alert level rises at once but drops only after three lower readings; one alert per
-  patient escalates in place; a Watch needs a confirming reading.
-- **Stage-safe.** Gemini has a hard timeout, validation and a cool-down; the WebSocket reconnects with backoff; every
-  screen has loading, empty and error states and an error boundary; CI runs the tests and the build on every push.
+- The 10-patient ward is **simulated** so a deterioration can be shown live; patients added from reports or who register
+  themselves are **real input, never simulated**.
+- The evaluation is on synthetic physiology — **not clinical validation**. The confidence indicator is a transparent
+  heuristic, not a calibrated probability.
+- No login or roles yet (a demo mode); SQLite in one process. Gemini needs the internet; everything else works offline.
 
 ## Future scope
 
-- **ABHA / ABDM integration** — pull history and push summaries through India's digital health stack; FHIR for
-  hospital EHRs.
-- **Wearables and bedside monitors** — continuous SpO₂, heart rate and blood pressure instead of manual rounds.
-- **WhatsApp / SMS alerts** — reach the on-call doctor, and remind patients about doses in their own language.
-- **B2B SaaS for hospitals, B2G for PHCs** — ward dashboards for private hospitals; ASHA-worker mode and low-bandwidth
-  views for primary health centres.
-- **Clinical validation** — retrospective evaluation on real ward data, then a prospective pilot with outcome tracking.
+- **Login and roles** (doctor, nurse, admin, patient, ASHA) with per-site data isolation and an audit log.
+- **ABHA / ABDM** identity and consent so a record follows the patient across sites; FHIR for hospital EHRs.
+- **Wearables and bedside monitors** for continuous vitals; **WhatsApp / SMS** alerts and dose reminders.
+- **Clinical validation** — retrospective on real ward data, then a prospective pilot.
 
 ## Team
 
