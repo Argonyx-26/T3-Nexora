@@ -1,6 +1,7 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { ArrowRight, BellRing, LayoutGrid, Rows3, Search, Siren, Stethoscope, TriangleAlert, UserPlus, Users, type LucideIcon } from "lucide-react";
 import { ScopeBar, useDirectory } from "../components/NetworkKit";
+import { InviteQR } from "../components/InviteQR";
 import { inScope, useScope } from "../lib/scope";
 import { forwardRef, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -96,6 +97,7 @@ export default function Doctor() {
               <Link to="/intake" className="inline-flex h-8 items-center gap-1.5 rounded-full bg-teal px-3.5 text-[12px] font-medium text-bg shadow-[0_0_24px_-6px_var(--glow)] transition-transform hover:-translate-y-0.5">
                 <UserPlus size={14} aria-hidden />Add patient from a report
               </Link>
+              <InviteQR />
             </div>
             {patients.data ? (
               <motion.h1

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AlertItem, Appointment, DoctorInfo, HospitalInfo, IntakeResult, ChatReply, ChatTurn, Checkin, DoctorNote, Insights, QueueItem, TimelineEvent, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
 
-export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "http://127.0.0.1:8000";
+// Dev: the API runs beside Vite. Production build (served by the API itself, or deployed): same origin, unless VITE_API_URL says otherwise.
+const FROM_ENV = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
+export const API_URL = FROM_ENV || (import.meta.env.PROD ? window.location.origin : "http://127.0.0.1:8000");
 
 export class ApiError extends Error {
   constructor(message: string, readonly status?: number) {
@@ -55,6 +57,8 @@ export const api = {
   doctors: (hospitalId?: string, s?: AbortSignal) => get<DoctorInfo[]>(`/doctors${hospitalId ? `?hospital_id=${hospitalId}` : ""}`, s),
   assign: (patientId: string, doctorId: string | null, by = "Doctor") =>
     post<{ patient_id: string; doctor_id: string; reason: string }>(`/patients/${patientId}/assign`, { doctor_id: doctorId, by }),
+  refer: (patientId: string, hospitalId: string, reason: string, by = "Doctor") =>
+    post<{ patient_id: string; from: string; to: string; doctor_id: string; reason: string }>(`/patients/${patientId}/refer`, { hospital_id: hospitalId, reason, by }),
   setDuty: (doctorId: string, onDuty: boolean) =>
     post<{ doctor_id: string; on_duty: boolean; handed_over: { patient_id: string; name: string; doctor_id: string; reason: string }[] }>(`/doctors/${doctorId}/duty`, { on_duty: onDuty }),
   extractReport: (body: { filename?: string; mime?: string; data_base64?: string; text?: string }) => post<IntakeResult>("/intake/extract", body),

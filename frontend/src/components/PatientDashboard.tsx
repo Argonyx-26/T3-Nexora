@@ -30,6 +30,7 @@ import { api } from "../lib/api";
 import { LEVEL_STYLE, fmtTime, istDateKey } from "../lib/format";
 import type { ChatTurn, Level, Medication, PatientSummary, Risk, Vital } from "../lib/types";
 import { LogoMark } from "./Logo";
+import { Speak } from "./Speak";
 import { Sparkline } from "./Sparkline";
 import { Skeleton, cx } from "./ui";
 
@@ -332,6 +333,7 @@ export function HealthSummary({ risk, lang, hr, title, sentence }: { risk?: Risk
           </div>
           <h1 className={cx("mt-3 font-display text-[clamp(34px,5vw,56px)] leading-[1.02]", s.text)}>{title}</h1>
           <p className="mt-3 max-w-xl text-[16px] leading-relaxed text-ink">{sentence}</p>
+          <Speak lang={lang} className="mt-4" text={[title, sentence, lang === "en" && reasons.length ? `What AYU is noticing: ${reasons.map((f) => f.headline).join(". ")}.` : ""].filter(Boolean).join(" ")} />
           <div className="mt-5">
             <div className="text-[12px] text-muted">{t.why}</div>
             <div className="mt-2 flex flex-wrap gap-2">
