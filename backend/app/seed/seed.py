@@ -22,6 +22,8 @@ from .patients import CHECKINS, DEFAULT_CHECKINS, DOCTORS, HISTORY, HOSPITALS, M
 from ..services.assign import DoctorLoad, pick_doctor
 from .physiology import IST, VitalGenerator
 
+DOSE_EXTRA_DAYS = 4
+
 STEP = timedelta(minutes=settings.minutes_per_tick)
 SNAPSHOT_EVERY = timedelta(minutes=30)
 SNAPSHOT_HOURS = 24
@@ -84,12 +86,15 @@ def seed_database(start: datetime | None = None, reset: bool = True) -> datetime
                 s.add(m)
                 s.flush()
                 dose_rows = []
-                first_day = (history_start + IST).replace(hour=0, minute=0)
-                for day in range(settings.history_days + 2):
+                # Doses reach DOSE_EXTRA_DAYS further back than the vitals, so a weekly pattern (missed weekend
+                # doses) always spans two weeks whatever time of day the demo is seeded; adherence still uses 7 days.
+                dose_start = history_start - timedelta(days=DOSE_EXTRA_DAYS)
+                first_day = (dose_start + IST).replace(hour=0, minute=0)
+                for day in range(settings.history_days + DOSE_EXTRA_DAYS + 2):
                     day_ist = first_day + timedelta(days=day)
                     for hhmm in med["times"]:
                         at = ist_time_to_utc(day_ist, hhmm)
-                        if at < history_start:
+                        if at < dose_start:
                             continue
                         if at > start:
                             status, recorded = "pending", None
