@@ -72,7 +72,7 @@ def test_no_key_uses_templates():
 def test_good_gemini_reply_is_used_and_cached(with_key, monkeypatch):
     ex = Explainer()
     calls = []
-    monkeypatch.setattr(ex, "_call_gemini", lambda r, lang: calls.append(1) or GOOD)
+    monkeypatch.setattr(ex, "_call_gemini", lambda r, lang: calls.append(1) or (GOOD, "test-model"))
     r = risk()
     assert run(ex, r)["source"] == "gemini"
     assert run(ex, r)["source"] == "gemini"
@@ -81,7 +81,7 @@ def test_good_gemini_reply_is_used_and_cached(with_key, monkeypatch):
 
 def test_invalid_reply_falls_back(with_key, monkeypatch):
     ex = Explainer()
-    monkeypatch.setattr(ex, "_call_gemini", lambda r, lang: "sorry, I can't")
+    monkeypatch.setattr(ex, "_call_gemini", lambda r, lang: ("sorry, I can't", "test-model"))
     assert run(ex, risk())["source"] == "template"
 
 
@@ -92,7 +92,7 @@ def test_slow_gemini_times_out_fast_and_then_is_skipped(with_key, monkeypatch):
     def slow(r, lang):
         calls.append(1)
         time.sleep(2)
-        return GOOD
+        return GOOD, "test-model"
 
     monkeypatch.setattr(ex, "_call_gemini", slow)
     r = risk()
@@ -121,3 +121,34 @@ def test_errors_fall_back(with_key, monkeypatch):
     monkeypatch.setattr(ex, "_call_gemini", boom)
     out = run(ex, risk(), "hi")
     assert out["source"] == "template" and out["lang"] == "hi"
+
+
+def test_a_busy_or_retired_model_falls_through_to_the_next(monkeypatch):
+    from app.explain import gemini
+
+    class Busy(Exception):
+        def __init__(self, code):
+            self.code = code
+
+    tried = []
+
+    class Models:
+        def generate_content(self, model, contents, config):
+            tried.append(model)
+            if model != "c":
+                raise Busy(503 if model == "a" else 404)
+            return type("R", (), {"text": "ok"})()
+
+    monkeypatch.setattr(gemini, "client", lambda t: type("C", (), {"models": Models()})())
+    assert gemini.generate(["a", "b", "c"], "hi", None, 1) == ("ok", "c") and tried == ["a", "b", "c"]
+
+    class Denied(Models):
+        def generate_content(self, model, contents, config):
+            raise Busy(403)  # a bad key is not a reason to try another model
+
+    monkeypatch.setattr(gemini, "client", lambda t: type("C", (), {"models": Denied()})())
+    try:
+        gemini.generate(["a", "b"], "hi", None, 1)
+        raise AssertionError("expected the 403 to be raised")
+    except Busy as e:
+        assert e.code == 403

@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass, field
 
 from ..config import settings
+from . import gemini
 
 log = logging.getLogger("ayu.assistant")
 
@@ -191,18 +192,11 @@ def builtin_reply(f: HealthFacts, message: str, lang: str) -> str:
 
 class Assistant:
     def __init__(self) -> None:
-        self._client = None
         self._skip_until = 0.0
 
-    def _call_gemini(self, f: HealthFacts, message: str, lang: str) -> str:
-        from google import genai
+    def _call_gemini(self, f: HealthFacts, message: str, lang: str) -> tuple[str, str]:
         from google.genai import types
 
-        if self._client is None:
-            self._client = genai.Client(
-                api_key=settings.gemini_api_key,
-                http_options=types.HttpOptions(timeout=int(settings.gemini_timeout_s * 1000)),
-            )
         convo = "\n".join(f"{h['role']}: {h['text']}" for h in f.history[-6:])
         prompt = json.dumps(f.payload(), ensure_ascii=False) + f"\n\nConversation so far:\n{convo}\n\nPatient: {message}"
         config = types.GenerateContentConfig(
@@ -211,8 +205,8 @@ class Assistant:
             max_output_tokens=400,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
-        reply = self._client.models.generate_content(model=settings.gemini_model, contents=prompt, config=config)
-        return (reply.text or "").strip()
+        text, model = gemini.generate(settings.text_models, prompt, config, settings.gemini_timeout_s)
+        return text.strip(), model
 
     async def reply(self, f: HealthFacts, message: str, lang: str) -> dict:
         lang = "hi" if lang == "hi" else "en"
@@ -220,9 +214,9 @@ class Assistant:
             return {"reply": URGENT[lang], "urgent": True, "source": "safety", "model": None}
         if settings.gemini_api_key and time.monotonic() >= self._skip_until:
             try:
-                raw = await asyncio.wait_for(asyncio.to_thread(self._call_gemini, f, message, lang), timeout=settings.gemini_timeout_s)
+                raw, model = await asyncio.wait_for(asyncio.to_thread(self._call_gemini, f, message, lang), timeout=settings.gemini_timeout_s * 2)
                 if raw and len(raw) <= MAX_REPLY and (lang != "hi" or DEVANAGARI.search(raw)):
-                    return {"reply": raw, "urgent": False, "source": "gemini", "model": settings.gemini_model}
+                    return {"reply": raw, "urgent": False, "source": "gemini", "model": model}
                 log.warning("assistant reply failed validation; using built-in answers")
             except Exception as e:  # timeout, network, quota: all fall back
                 log.warning("gemini unavailable for the assistant (%s)", type(e).__name__)

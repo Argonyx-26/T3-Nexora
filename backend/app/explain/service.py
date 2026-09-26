@@ -22,6 +22,7 @@ from datetime import datetime
 
 from ..config import settings
 from ..risk import RiskResult
+from . import gemini
 from .templates import template_explanation
 
 log = logging.getLogger("ayu.explain")
@@ -83,22 +84,15 @@ def parse_reply(raw: str, lang: str) -> dict | None:
 
 class Explainer:
     def __init__(self) -> None:
-        self._client = None
         self._cache: dict[tuple, tuple[float, dict]] = {}
         self._skip_until = 0.0
 
     def _key(self, patient_id: str, risk: RiskResult, lang: str) -> tuple:
         return (patient_id, lang, risk.level, risk.score // 5, tuple(f.factor for f in risk.factors[:3]))
 
-    def _call_gemini(self, risk: RiskResult, lang: str) -> str:
-        from google import genai
+    def _call_gemini(self, risk: RiskResult, lang: str) -> tuple[str, str]:
         from google.genai import types
 
-        if self._client is None:
-            self._client = genai.Client(
-                api_key=settings.gemini_api_key,
-                http_options=types.HttpOptions(timeout=int(settings.gemini_timeout_s * 1000)),
-            )
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT.replace("LANGUAGE", LANGUAGE[lang]),
             response_mime_type="application/json",
@@ -106,12 +100,7 @@ class Explainer:
             max_output_tokens=600,
             thinking_config=types.ThinkingConfig(thinking_budget=0),  # latency matters more than depth here
         )
-        reply = self._client.models.generate_content(
-            model=settings.gemini_model,
-            contents=json.dumps(build_payload(risk), ensure_ascii=False),
-            config=config,
-        )
-        return reply.text or ""
+        return gemini.generate(settings.text_models, json.dumps(build_payload(risk), ensure_ascii=False), config, settings.gemini_timeout_s)
 
     async def explain(self, patient_id: str, risk: RiskResult, lang: str, now: datetime) -> dict:
         lang = "hi" if lang == "hi" else "en"
@@ -123,10 +112,10 @@ class Explainer:
 
         if settings.gemini_api_key and time.monotonic() >= self._skip_until:
             try:
-                raw = await asyncio.wait_for(asyncio.to_thread(self._call_gemini, risk, lang), timeout=settings.gemini_timeout_s)
+                raw, model = await asyncio.wait_for(asyncio.to_thread(self._call_gemini, risk, lang), timeout=settings.gemini_timeout_s * 2)
                 parsed = parse_reply(raw, lang)
                 if parsed:
-                    result = {**parsed, "source": "gemini", "model": settings.gemini_model}
+                    result = {**parsed, "source": "gemini", "model": model}
                     self._cache[key] = (time.monotonic(), result)
                     return {**base, **result}
                 log.warning("gemini reply failed validation; using the template")

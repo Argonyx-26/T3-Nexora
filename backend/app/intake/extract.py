@@ -20,11 +20,12 @@ import re
 import time
 
 from ..config import settings
+from ..explain import gemini
 from ..risk import weights as W
 
 log = logging.getLogger("ayu.intake")
 
-EXTRACT_TIMEOUT_S = 25.0
+EXTRACT_TIMEOUT_S = 15.0  # per model; the whole chain is capped at three times this
 MAX_TEXT = 60_000
 
 RANGES = {"hr": (20, 250), "spo2": (50, 100), "sbp": (50, 260), "dbp": (30, 160), "rr": (4, 60), "temp": (30, 43), "glucose": (20, 800)}
@@ -230,30 +231,23 @@ Frequencies: OD → ["08:00"], BD → ["08:00","20:00"], TDS → ["08:00","14:00
 critical = true for insulin, anticoagulants, antiplatelets, rate/rhythm drugs, anti-epileptics, IV antibiotics, steroids.
 Use the most recent set of vitals if there are several."""
 
-_client = None
 _skip_until = 0.0
 
 
 def _gemini_extract(data: bytes | None, mime: str | None, text: str | None) -> dict:
-    from google import genai
     from google.genai import types
 
-    global _client
-    if _client is None:
-        _client = genai.Client(api_key=settings.gemini_api_key,
-                               http_options=types.HttpOptions(timeout=int(EXTRACT_TIMEOUT_S * 1000)))
     prompt = PROMPT.replace("SYMPTOM_KEYS", ", ".join(sorted(W.SYMPTOMS)))
     contents: list = [prompt]
     if data is not None:
         contents.append(types.Part.from_bytes(data=data, mime_type=mime or "application/octet-stream"))
     if text:
         contents.append(text[:MAX_TEXT])
-    reply = _client.models.generate_content(
-        model=settings.gemini_model, contents=contents,
-        config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.0, max_output_tokens=2000,
-                                           thinking_config=types.ThinkingConfig(thinking_budget=0)),
-    )
-    raw = json.loads(reply.text or "{}")
+    config = types.GenerateContentConfig(response_mime_type="application/json", temperature=0.0, max_output_tokens=2000,
+                                         thinking_config=types.ThinkingConfig(thinking_budget=0))
+    text_out, model = gemini.generate(settings.vision_models, contents, config, EXTRACT_TIMEOUT_S)
+    raw = json.loads(text_out or "{}")
+    raw["_model"] = model
     vit = raw.get("vitals") or {}
     raw["vitals"] = {"hr": vit.get("hr"), "spo2": vit.get("spo2"), "sbp": vit.get("sbp"), "dbp": vit.get("dbp"),
                      "rr": vit.get("rr"), "temp": vit.get("temp_c"), "glucose": vit.get("glucose_mg_dl")}
@@ -267,9 +261,9 @@ async def extract(data: bytes | None, mime: str | None, text: str | None) -> dic
     is_image = bool(mime and mime.startswith("image/"))
     if settings.gemini_api_key and time.monotonic() >= _skip_until:
         try:
-            raw = await asyncio.wait_for(asyncio.to_thread(_gemini_extract, data, mime, text), timeout=EXTRACT_TIMEOUT_S)
+            raw = await asyncio.wait_for(asyncio.to_thread(_gemini_extract, data, mime, text), timeout=EXTRACT_TIMEOUT_S * 3)
             draft = clean_draft(raw)
-            return {"draft": draft, "source": "gemini", "model": settings.gemini_model, "found": _found(draft),
+            return {"draft": draft, "source": "gemini", "model": raw.get("_model"), "found": _found(draft),
                     "message": "Read by Gemini. Check every value before adding the patient."}
         except Exception as e:  # network, quota, bad file: fall back to the built-in reader
             log.warning("gemini extraction failed (%s); using the built-in reader", type(e).__name__)
