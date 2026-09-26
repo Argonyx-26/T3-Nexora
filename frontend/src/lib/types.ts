@@ -363,3 +363,23 @@ export interface Appointment {
   scheduled_for: string | null;
   video_url: string;
 }
+
+export interface IntakeDraft {
+  name: string;
+  age: number | null;
+  sex: "M" | "F" | "";
+  conditions: string[];
+  medications: { name: string; dose: string; purpose: string; times: string[]; critical: boolean }[];
+  vitals: Partial<Record<"hr" | "spo2" | "sbp" | "dbp" | "rr" | "temp" | "glucose", number>>;
+  symptoms: string[];
+  history: { year: string; event: string }[];
+  notes: string;
+}
+
+export interface IntakeResult {
+  draft: IntakeDraft;
+  source: "gemini" | "builtin";
+  model: string | null;
+  found: string[];
+  message: string;
+}

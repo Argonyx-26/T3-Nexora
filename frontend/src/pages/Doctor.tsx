@@ -1,5 +1,5 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
-import { ArrowRight, BellRing, LayoutGrid, Rows3, Search, Siren, TriangleAlert, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, BellRing, LayoutGrid, Rows3, Search, Siren, TriangleAlert, UserPlus, Users, type LucideIcon } from "lucide-react";
 import { forwardRef, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertToaster, AlertsPanel, LiveStatus } from "../components/alerts";
@@ -83,7 +83,12 @@ export default function Doctor() {
         {/* Heading */}
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <Eyebrow>Ward overview · all beds</Eyebrow>
+            <div className="flex flex-wrap items-center gap-3">
+              <Eyebrow>Ward overview · all beds</Eyebrow>
+              <Link to="/intake" className="inline-flex h-8 items-center gap-1.5 rounded-full bg-teal px-3.5 text-[12px] font-medium text-bg shadow-[0_0_24px_-6px_var(--glow)] transition-transform hover:-translate-y-0.5">
+                <UserPlus size={14} aria-hidden />Add patient from a report
+              </Link>
+            </div>
             {patients.data ? (
               <motion.h1
                 key={headline(list).lead}

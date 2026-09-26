@@ -1,0 +1,56 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Length 1433 >>
+stream
+BT
+/F2 16 Tf 1 0 0 1 56 800 Tm (City General Hospital - Admission Summary \(SAMPLE, synthetic data\)) Tj
+/F1 11 Tf 1 0 0 1 56 776 Tm (Patient Name: Anita Sharma) Tj
+/F1 11 Tf 1 0 0 1 56 759 Tm (Age: 61 years      Sex: Female      IP No: 24-1187) Tj
+/F1 11 Tf 1 0 0 1 56 742 Tm (Date: 26/09/2026   Ward: Medicine) Tj
+/F2 11 Tf 1 0 0 1 56 725 Tm (Presenting complaints:) Tj
+/F1 11 Tf 1 0 0 1 56 708 Tm (Breathlessness for 2 days, cough with sputum, fever with chills since last night.) Tj
+/F2 11 Tf 1 0 0 1 56 691 Tm (Past history:) Tj
+/F1 11 Tf 1 0 0 1 56 674 Tm (2014 - Hypertension diagnosed) Tj
+/F1 11 Tf 1 0 0 1 56 657 Tm (2019 - Type 2 diabetes diagnosed) Tj
+/F2 11 Tf 1 0 0 1 56 640 Tm (Vitals on admission:) Tj
+/F1 11 Tf 1 0 0 1 56 623 Tm (BP: 168/98 mmHg    Pulse: 108 /min    Resp. Rate: 24 /min) Tj
+/F1 11 Tf 1 0 0 1 56 606 Tm (SpO2: 93% on room air    Temp: 101.2 F    RBS: 245 mg/dL) Tj
+/F2 11 Tf 1 0 0 1 56 589 Tm (Current medications:) Tj
+/F1 11 Tf 1 0 0 1 56 572 Tm (Tab Metformin 500 mg BD) Tj
+/F1 11 Tf 1 0 0 1 56 555 Tm (Tab Amlodipine 5 mg OD) Tj
+/F1 11 Tf 1 0 0 1 56 538 Tm (Inj Insulin Glargine 18 units HS) Tj
+/F1 11 Tf 1 0 0 1 56 521 Tm (Tab Paracetamol 650 mg TDS for fever) Tj
+/F1 11 Tf 1 0 0 1 56 504 Tm (Impression: Suspected community-acquired pneumonia in a known hypertensive, diabetic patient.) Tj
+/F1 11 Tf 1 0 0 1 56 487 Tm (Plan: chest X-ray, blood cultures, start antibiotics as per protocol.) Tj
+ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000321 00000 n 
+0000000396 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1881
+%%EOF

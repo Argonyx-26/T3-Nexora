@@ -12,6 +12,7 @@ const PatientDetail = lazy(() => import("./pages/PatientDetail"));
 const Demo = lazy(() => import("./pages/Demo"));
 const Evaluation = lazy(() => import("./pages/Evaluation"));
 const CommandCenter = lazy(() => import("./pages/CommandCenter"));
+const Intake = lazy(() => import("./pages/Intake"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PatientPicker = lazy(() => import("./pages/PatientPortal").then((m) => ({ default: m.PatientPicker })));
 const PatientHome = lazy(() => import("./pages/PatientPortal").then((m) => ({ default: m.PatientHome })));
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/doctor" element={<Doctor />} />
             <Route path="/command" element={<CommandCenter />} />
+            <Route path="/intake" element={<Intake />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/evaluation" element={<Evaluation />} />
             <Route path="/patients/:id" element={<PatientDetail />} />

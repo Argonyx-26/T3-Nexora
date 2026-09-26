@@ -110,7 +110,10 @@ export function friendlyFactor(f: Factor, lang: Lang): string {
   if (m) {
     const name = VITAL_NAME[lang][m[1]];
     const down = /below|falling|down|lower|decreas/i.test(f.message);
-    if (m[2] === "baseline") return hi ? `आपका ${name} आपके सामान्य से ${down ? "कम" : "ज़्यादा"} है` : `Your ${name} is ${down ? "lower" : "higher"} than your usual`;
+    if (m[2] === "baseline") {
+      const typical = /typical/i.test(f.message);
+      return hi ? `आपका ${name} ${typical ? "सामान्य स्तर" : "आपके सामान्य"} से ${down ? "कम" : "ज़्यादा"} है` : `Your ${name} is ${down ? "lower" : "higher"} than ${typical ? "the typical range" : "your usual"}`;
+    }
     return hi ? `आपका ${name} कुछ घंटों से ${down ? "घट" : "बढ़"} रहा है` : `Your ${name} has been ${down ? "falling" : "rising"} for a few hours`;
   }
   if (f.kind === "news2") return hi ? "अस्पताल की सामान्य जाँच (NEWS2) का स्कोर बढ़ा है" : "The standard ward check (NEWS2) has gone up";

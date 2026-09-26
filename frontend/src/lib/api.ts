@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AlertItem, Appointment, ChatReply, ChatTurn, Checkin, DoctorNote, Insights, QueueItem, TimelineEvent, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
+import type { AlertItem, Appointment, IntakeResult, ChatReply, ChatTurn, Checkin, DoctorNote, Insights, QueueItem, TimelineEvent, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "http://127.0.0.1:8000";
 
@@ -51,6 +51,8 @@ export const api = {
   timeline: (id: string, hours = 48, s?: AbortSignal, audience: "doctor" | "patient" = "doctor") =>
     get<TimelineEvent[]>(`/patients/${id}/timeline?hours=${hours}&audience=${audience}`, s),
   insights: (id: string, s?: AbortSignal) => get<Insights>(`/patients/${id}/insights`, s),
+  extractReport: (body: { filename?: string; mime?: string; data_base64?: string; text?: string }) => post<IntakeResult>("/intake/extract", body),
+  createPatient: (body: unknown) => post<{ patient_id: string; patient: PatientSummary }>("/patients", body),
   queue: (s?: AbortSignal) => get<QueueItem[]>("/insights", s),
   notes: (id: string, visibleOnly = false, s?: AbortSignal) => get<DoctorNote[]>(`/patients/${id}/notes?visible_only=${visibleOnly}`, s),
   addNote: (id: string, body: { text: string; kind?: "note" | "followup"; visible?: boolean; follow_up_on?: string; author?: string }) =>
