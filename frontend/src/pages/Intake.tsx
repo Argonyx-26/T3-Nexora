@@ -20,6 +20,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Shell } from "../components/Shell";
+import { useDirectory } from "../components/NetworkKit";
+import { useScope } from "../lib/scope";
 import { Eyebrow, RiskBadge, cx } from "../components/ui";
 import { api } from "../lib/api";
 import { LEVEL_STYLE, RED_FLAG_SYMPTOMS, SYMPTOM_LABEL } from "../lib/format";
@@ -296,6 +298,9 @@ function Review({ draft, setDraft, result, source, fileName, onBack, onCreated, 
   const [language, setLanguage] = useState<"en" | "hi">("en");
   const [bed, setBed] = useState("");
   const [scale2, setScale2] = useState(draft.conditions.some((c) => /copd/i.test(c)));
+  const [scope] = useScope();
+  const [site, setSite] = useState(scope.hospital !== "all" ? scope.hospital : "H01");
+  const { hospitals } = useDirectory();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const set = <K extends keyof IntakeDraft>(k: K, v: IntakeDraft[K]) => setDraft({ ...draft, [k]: v });
@@ -308,7 +313,7 @@ function Review({ draft, setDraft, result, source, fileName, onBack, onCreated, 
     try {
       const v = draft.vitals;
       const r = await api.createPatient({
-        name: draft.name, age: draft.age, sex: draft.sex, language, bed, spo2_scale: scale2 ? 2 : 1,
+        name: draft.name, age: draft.age, sex: draft.sex, language, bed, spo2_scale: scale2 ? 2 : 1, hospital_id: site,
         conditions: draft.conditions, medications: draft.medications.filter((m) => m.name.trim()),
         vitals: { hr: v.hr, spo2: v.spo2, sbp: v.sbp, dbp: v.dbp, rr: v.rr, temp: v.temp, glucose: v.glucose ?? null },
         symptoms: draft.symptoms, history: draft.history.filter((h) => h.event.trim()), notes: draft.notes, report_name: fileName, source,
@@ -349,6 +354,10 @@ function Review({ draft, setDraft, result, source, fileName, onBack, onCreated, 
               <button key={s} type="button" onClick={() => set("sex", s)} aria-pressed={draft.sex === s}
                 className={cx("h-11 flex-1 rounded-xl border text-[14px]", draft.sex === s ? "border-teal bg-teal-soft text-teal" : "border-line")}>{s === "F" ? "Female" : "Male"}</button>
             ))}</div></div>
+          <label className="block sm:col-span-3"><span className="text-[12px] text-muted">Site</span>
+            <select value={site} onChange={(e) => setSite(e.target.value)} className={cx(input, "mt-1")}>
+              {(hospitals.data ?? [{ id: "H01", name: "City General Hospital" }]).map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </select></label>
           <label className="block"><span className="text-[12px] text-muted">Bed (optional)</span>
             <input value={bed} onChange={(e) => setBed(e.target.value)} placeholder="auto" className={cx(input, "mt-1")} /></label>
           <div><span className="text-[12px] text-muted">Language</span>

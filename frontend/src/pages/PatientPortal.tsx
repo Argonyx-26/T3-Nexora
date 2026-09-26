@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Shell } from "../components/Shell";
-import { HandHeart, Languages, NotebookPen, UserRound } from "lucide-react";
+import { HandHeart, Languages, NotebookPen, UserPlus, UserRound } from "lucide-react";
 import { VITAL_ICON, ic } from "../components/icons";
 import { PatientArt } from "../components/Illustrations";
 import { AdherenceTracker, AssistantChat, DailyCard, HealthSummary, Overview, Prescriptions, PulseOxTracker, WeatherCard } from "../components/PatientDashboard";
@@ -85,6 +85,9 @@ export function PatientPicker() {
             <Eyebrow icon={UserRound}>Patient view · demo sign-in</Eyebrow>
             <h1 className="mt-3 font-display text-[clamp(44px,6vw,80px)] leading-none tracking-[-0.02em]">Who are you?</h1>
             <p className="mt-3 text-[15px] text-muted">Pick your name to see your status. <span className="text-ink-2">अपना नाम चुनें।</span></p>
+            <Link to="/register" className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-teal px-5 text-[14px] font-medium text-bg shadow-[0_0_28px_-8px_var(--glow)] transition-transform hover:-translate-y-0.5">
+              <UserPlus size={16} aria-hidden />New here? Register yourself · खुद को जोड़ें
+            </Link>
           </div>
           <PatientArt className="w-48 shrink-0 self-center sm:w-56 sm:self-auto" />
         </div>

@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 import { AlertToaster, LiveStatus } from "../components/alerts";
 import { AppointmentRow, ChangeRow, ConfidenceBadge, PRIORITY_STYLE } from "../components/DoctorKit";
 import { Shell } from "../components/Shell";
+import { ScopeBar } from "../components/NetworkKit";
+import { inScope, useScope } from "../lib/scope";
 import { EmptyState, ErrorState, Eyebrow, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
 import { useLive } from "../lib/live";
@@ -33,11 +35,13 @@ export default function CommandCenter() {
     queue.reload();
   }, [live.seq]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const items = (queue.data ?? []).filter((q) => q.priority);
+  const [scope] = useScope();
+  const scoped = (queue.data ?? []).filter((q) => inScope(scope, q));
+  const items = scoped.filter((q) => q.priority);
   const count = (p: Priority) => items.filter((q) => q.priority === p).length;
   const shown = items.filter((q) => filter === "All" || q.priority === filter);
-  const sudden = (queue.data ?? []).flatMap((q) => q.sudden_changes.map((c) => ({ q, c })));
-  const patterns = (queue.data ?? []).flatMap((q) => [
+  const sudden = scoped.flatMap((q) => q.sudden_changes.map((c) => ({ q, c })));
+  const patterns = scoped.flatMap((q) => [
     ...q.missed_patterns.filter((m) => m.kind !== "time").map((m) => ({ q, text: m.text, icon: m.kind === "critical" ? Siren : Repeat, tab: "meds" })),
     ...q.mood_changes.map((m) => ({ q, text: m.text, icon: TrendingDown, tab: "overview" })),
   ]);
@@ -83,7 +87,8 @@ export default function CommandCenter() {
           </div>
         </div>
 
-        <div className="mt-10 flex flex-wrap gap-1.5" role="tablist" aria-label="Filter by priority">
+        <ScopeBar className="mt-8" />
+        <div className="mt-4 flex flex-wrap gap-1.5" role="tablist" aria-label="Filter by priority">
           {FILTERS.map((f) => (
             <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}
               className={cx("inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] transition-colors", filter === f ? "bg-ink text-bg" : "text-muted hover:text-ink")}>

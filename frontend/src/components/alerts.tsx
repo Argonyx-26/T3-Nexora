@@ -279,9 +279,9 @@ export function AlertCard({ alert, compact = false }: { alert: AlertItem; compac
   );
 }
 
-export function AlertsPanel() {
+export function AlertsPanel({ only }: { only?: Set<string> }) {
   const live = useLive();
-  const alerts = live.alerts;
+  const alerts = only ? live.alerts.filter((a) => only.has(a.patient_id)) : live.alerts;
   const fresh = alerts.filter((a) => a.status === "new").length;
   return (
     <div className="rounded-3xl border border-line bg-surface/60 p-5 backdrop-blur">

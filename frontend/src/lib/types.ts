@@ -78,6 +78,11 @@ export interface Patient {
   normals: Record<string, { mean: number; std: number }>;
   notes: string;
   history: { year: string; event: string }[];
+  source?: string;
+  hospital_id?: string;
+  doctor_id?: string;
+  assigned_reason?: string;
+  registered_by?: "seed" | "clinician" | "self";
 }
 
 export interface PatientSummary extends Patient {
@@ -325,6 +330,9 @@ export interface QueueItem {
   name: string;
   bed: string;
   ward: string;
+  hospital_id: string;
+  doctor_id: string;
+  registered_by: string;
   priority: Priority | null;
   level: Level;
   score: number;
@@ -382,4 +390,28 @@ export interface IntakeResult {
   model: string | null;
   found: string[];
   message: string;
+}
+
+export interface HospitalInfo {
+  id: string;
+  name: string;
+  city: string;
+  kind: "hospital" | "phc" | "clinic";
+  patients: number;
+  high_risk: number;
+  unassigned: number;
+  doctors: number;
+  on_duty: number;
+}
+
+export interface DoctorInfo {
+  id: string;
+  name: string;
+  specialty: string;
+  hospital_id: string;
+  on_duty: boolean;
+  max_patients: number;
+  patients: string[];
+  high_risk: number;
+  load: number;
 }

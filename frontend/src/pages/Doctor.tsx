@@ -1,5 +1,7 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
-import { ArrowRight, BellRing, LayoutGrid, Rows3, Search, Siren, TriangleAlert, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, BellRing, LayoutGrid, Rows3, Search, Siren, Stethoscope, TriangleAlert, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { ScopeBar, useDirectory } from "../components/NetworkKit";
+import { inScope, useScope } from "../lib/scope";
 import { forwardRef, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertToaster, AlertsPanel, LiveStatus } from "../components/alerts";
@@ -50,9 +52,11 @@ export default function Doctor() {
   const [q, setQ] = useState("");
 
   const live = useLive();
+  const [scope] = useScope();
+  const { doctorById } = useDirectory();
   // Static details from REST, live risk and vitals from the stream, highest score first.
   const list = useMemo(() => {
-    const base = patients.data ?? [];
+    const base = (patients.data ?? []).filter((p) => inScope(scope, p));
     return base
       .map((p) => {
         const u = live.patients[p.id];
@@ -64,13 +68,17 @@ export default function Doctor() {
         const kb = RANK[b.risk.level] * 1000 + (b.risk.level === "Stable" ? 0 : b.risk.score);
         return kb - ka || a.bed.localeCompare(b.bed);
       });
-  }, [patients.data, live.patients]);
+  }, [patients.data, live.patients, scope]);
   const series = (id: string) => {
     const rest = vitals.data?.[id];
     if (!rest) return undefined;
     const lastTs = rest.length ? rest[rest.length - 1].ts : "";
     return [...rest, ...(live.trail[id] ?? []).filter((v) => v.ts > lastTs)].slice(-36);
   };
+  const scopedAlerts = useMemo(() => {
+    const ids = new Set(list.map((p) => p.id));
+    return live.alerts.filter((a) => ids.has(a.patient_id));
+  }, [list, live.alerts]);
   const counts = useMemo(() => Object.fromEntries(LEVELS.map((l) => [l, list.filter((p) => p.risk.level === l).length])) as Record<Level, number>, [list]);
   const shown = list.filter(
     (p) => (filter === "All" || p.risk.level === filter) && (!q || `${p.name} ${p.bed} ${p.conditions.join(" ")}`.toLowerCase().includes(q.toLowerCase())),
@@ -109,13 +117,15 @@ export default function Doctor() {
             <Kpi label="Patients" icon={Users} value={list.length} loading={!patients.data} />
             <Kpi label="Critical" icon={Siren} value={counts.Critical ?? 0} level="Critical" loading={!patients.data} />
             <Kpi label="Warning" icon={TriangleAlert} value={counts.Warning ?? 0} level="Warning" loading={!patients.data} />
-            <Kpi label="Open alerts" icon={BellRing} value={live.alerts.length} level={live.alerts.some((a) => a.status === "new") ? "Critical" : undefined} loading={!patients.data} />
+            <Kpi label="Open alerts" icon={BellRing} value={scopedAlerts.length} level={scopedAlerts.some((a) => a.status === "new") ? "Critical" : undefined} loading={!patients.data} />
           </div>
           </div>
         </div>
 
+        <ScopeBar className="mt-8" />
+
         {/* Controls */}
-        <div className="mt-12 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter by risk level">
             {(["All", ...[...LEVELS].reverse()] as const).map((l) => (
               <button
@@ -172,13 +182,13 @@ export default function Doctor() {
             ) : shown.length === 0 ? (
               <EmptyState title="No patients match">Try another level or clear the search.</EmptyState>
             ) : view === "table" ? (
-              <RecordsTable rows={shown} queue={queue.data} />
+              <RecordsTable rows={shown} queue={queue.data} doctorName={(id) => doctorById[id]?.name} />
             ) : (
               <LayoutGroup>
                 <motion.div layout className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                   <AnimatePresence mode="popLayout">
                     {shown.map((p, i) => (
-                      <PatientCard key={p.id} p={p} vitals={series(p.id)} index={i} />
+                      <PatientCard key={p.id} p={p} vitals={series(p.id)} index={i} doctor={p.doctor_id ? doctorById[p.doctor_id]?.name : undefined} />
                     ))}
                   </AnimatePresence>
                 </motion.div>
@@ -188,7 +198,7 @@ export default function Doctor() {
 
           {/* Alerts */}
           <aside className="xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:self-start xl:overflow-y-auto">
-            <AlertsPanel />
+            <AlertsPanel only={scope.hospital === "all" && scope.doctor === "all" ? undefined : new Set(list.map((p) => p.id))} />
           </aside>
         </div>
       </div>
@@ -215,7 +225,7 @@ function Kpi({ label, value, level, loading, icon: Icon }: { label: string; valu
   );
 }
 
-const PatientCard = forwardRef<HTMLDivElement, { p: PatientSummary; vitals?: Vital[]; index: number }>(function PatientCard({ p, vitals, index }, ref) {
+const PatientCard = forwardRef<HTMLDivElement, { p: PatientSummary; vitals?: Vital[]; index: number; doctor?: string }>(function PatientCard({ p, vitals, index, doctor }, ref) {
   const s = LEVEL_STYLE[p.risk.level];
   const critical = p.risk.level === "Critical";
   return (
@@ -293,7 +303,10 @@ const PatientCard = forwardRef<HTMLDivElement, { p: PatientSummary; vitals?: Vit
         </div>
 
         <div className="mt-5 border-t border-line pt-3">
-          <div className="eyebrow">Why</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="eyebrow">Why</div>
+            {doctor && <span className="inline-flex items-center gap-1 truncate text-[11px] text-muted"><Stethoscope size={11} aria-hidden />{doctor}</span>}
+          </div>
           <div className="mt-1 line-clamp-1 text-[13px] text-ink-2">{p.risk.summary}</div>
         </div>
       </Link>
@@ -302,7 +315,7 @@ const PatientCard = forwardRef<HTMLDivElement, { p: PatientSummary; vitals?: Vit
 });
 
 /** Patient records: every assigned patient in one sortable-by-risk table. */
-function RecordsTable({ rows, queue }: { rows: PatientSummary[]; queue?: QueueItem[] }) {
+function RecordsTable({ rows, queue, doctorName }: { rows: PatientSummary[]; queue?: QueueItem[]; doctorName: (id: string) => string | undefined }) {
   const byId = Object.fromEntries((queue ?? []).map((q) => [q.patient_id, q]));
   return (
     <div className="overflow-x-auto rounded-3xl border border-line bg-surface">
@@ -331,6 +344,7 @@ function RecordsTable({ rows, queue }: { rows: PatientSummary[]; queue?: QueueIt
                 <td className="px-4 py-3">
                   <Link to={`/patients/${p.id}`} className="font-medium hover:underline">{p.name}</Link>
                   <div className="font-mono text-[11px] text-muted">{p.age} · {p.sex} · {p.bed} · {p.conditions[0]}</div>
+                  {p.doctor_id && <div className="text-[11px] text-teal">{doctorName(p.doctor_id)}</div>}
                 </td>
                 <td className="px-3 py-3"><RiskBadge level={p.risk.level} size="sm" /></td>
                 <td className={cx("px-3 py-3 text-right font-display text-[20px] tnum", s.text)}>{p.risk.score}</td>

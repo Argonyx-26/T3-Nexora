@@ -8,6 +8,7 @@ import { EmptyState, ErrorState, Eyebrow, LevelDot, Skeleton, cx } from "../comp
 import { api, useQuery } from "../lib/api";
 import { LEVEL_STYLE, fmtTime } from "../lib/format";
 import { useLive } from "../lib/live";
+import { setScope } from "../lib/scope";
 
 const SPEEDS = [1, 5, 20];
 const SYMPTOM_ICON: Record<string, LucideIcon> = { chest_pain: HeartCrack, breathlessness: Wind, confusion: Brain, severe_headache: Zap };
@@ -94,7 +95,7 @@ export default function Demo() {
               <span className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => run("reset", async () => { await api.reset(); setConfirmReset(false); })}
+                  onClick={() => run("reset", async () => { await api.reset(); setScope({ hospital: "all", doctor: "all" }); setConfirmReset(false); })}
                   className="h-12 rounded-full bg-critical px-5 text-[14px] font-medium text-white"
                 >
                   {busy === "reset" ? "Resetting…" : "Yes, reset everything"}

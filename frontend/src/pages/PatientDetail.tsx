@@ -7,6 +7,7 @@ import { AlertCard, AlertToaster, LiveStatus } from "../components/alerts";
 import { ExplanationCard } from "../components/ExplanationCard";
 import { VITAL_ICON, ic } from "../components/icons";
 import { BeatingHeart, PulseStrip } from "../components/PageArt";
+import { CareLine } from "../components/NetworkKit";
 import { DoctorTimeline, HistoryCard, InsightStrip, MedicationCalendar, MentalHealthCard, NotesAndCare, RecentChanges, TREND_RANGES, TrendExplorer, type TrendRange } from "../components/DoctorKit";
 import { Shell } from "../components/Shell";
 import { VitalChart } from "../components/VitalChart";
@@ -123,6 +124,7 @@ export default function PatientDetail() {
                   {p.spo2_scale === 2 && <span className="rounded-full bg-teal-soft px-3 py-0.5 text-[12px] text-teal">NEWS2 SpO₂ scale 2</span>}
                 </div>
                 {p.notes && <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-muted">{p.notes}</p>}
+                <CareLine patient={p} onChanged={() => patient.reload()} />
               </>
             ) : (
               <div className="space-y-3"><Skeleton className="h-4 w-48" /><Skeleton className="h-16 w-96 max-w-full" /><Skeleton className="h-6 w-72" /></div>

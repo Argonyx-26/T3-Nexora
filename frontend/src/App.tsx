@@ -13,6 +13,8 @@ const Demo = lazy(() => import("./pages/Demo"));
 const Evaluation = lazy(() => import("./pages/Evaluation"));
 const CommandCenter = lazy(() => import("./pages/CommandCenter"));
 const Intake = lazy(() => import("./pages/Intake"));
+const Network = lazy(() => import("./pages/Network"));
+const Register = lazy(() => import("./pages/Register"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PatientPicker = lazy(() => import("./pages/PatientPortal").then((m) => ({ default: m.PatientPicker })));
 const PatientHome = lazy(() => import("./pages/PatientPortal").then((m) => ({ default: m.PatientHome })));
@@ -59,6 +61,8 @@ export default function App() {
             <Route path="/doctor" element={<Doctor />} />
             <Route path="/command" element={<CommandCenter />} />
             <Route path="/intake" element={<Intake />} />
+            <Route path="/network" element={<Network />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/evaluation" element={<Evaluation />} />
             <Route path="/patients/:id" element={<PatientDetail />} />

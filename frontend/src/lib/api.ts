@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AlertItem, Appointment, IntakeResult, ChatReply, ChatTurn, Checkin, DoctorNote, Insights, QueueItem, TimelineEvent, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
+import type { AlertItem, Appointment, DoctorInfo, HospitalInfo, IntakeResult, ChatReply, ChatTurn, Checkin, DoctorNote, Insights, QueueItem, TimelineEvent, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "http://127.0.0.1:8000";
 
@@ -51,6 +51,12 @@ export const api = {
   timeline: (id: string, hours = 48, s?: AbortSignal, audience: "doctor" | "patient" = "doctor") =>
     get<TimelineEvent[]>(`/patients/${id}/timeline?hours=${hours}&audience=${audience}`, s),
   insights: (id: string, s?: AbortSignal) => get<Insights>(`/patients/${id}/insights`, s),
+  hospitals: (s?: AbortSignal) => get<HospitalInfo[]>("/hospitals", s),
+  doctors: (hospitalId?: string, s?: AbortSignal) => get<DoctorInfo[]>(`/doctors${hospitalId ? `?hospital_id=${hospitalId}` : ""}`, s),
+  assign: (patientId: string, doctorId: string | null, by = "Doctor") =>
+    post<{ patient_id: string; doctor_id: string; reason: string }>(`/patients/${patientId}/assign`, { doctor_id: doctorId, by }),
+  setDuty: (doctorId: string, onDuty: boolean) =>
+    post<{ doctor_id: string; on_duty: boolean; handed_over: { patient_id: string; name: string; doctor_id: string; reason: string }[] }>(`/doctors/${doctorId}/duty`, { on_duty: onDuty }),
   extractReport: (body: { filename?: string; mime?: string; data_base64?: string; text?: string }) => post<IntakeResult>("/intake/extract", body),
   createPatient: (body: unknown) => post<{ patient_id: string; patient: PatientSummary }>("/patients", body),
   queue: (s?: AbortSignal) => get<QueueItem[]>("/insights", s),

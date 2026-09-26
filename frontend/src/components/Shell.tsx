@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ChartLine, LayoutDashboard, Moon, Siren, Sun, UserRound, type LucideIcon } from "lucide-react";
+import { ChartLine, LayoutDashboard, Moon, Network, Siren, Sun, UserRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { DISCLAIMER } from "../lib/format";
@@ -38,6 +38,7 @@ export function ThemeToggle() {
 const NAV: { to: string; label: string; short: string; icon: LucideIcon; tiny?: string }[] = [
   { to: "/doctor", label: "Ward", short: "Ward", icon: LayoutDashboard },
   { to: "/command", label: "Command center", short: "Alerts", icon: Siren },
+  { to: "/network", label: "Network", short: "Sites", icon: Network, tiny: "max-[519px]:hidden" },
   { to: "/evaluation", label: "Evaluation", short: "Proof", icon: ChartLine, tiny: "max-[419px]:hidden" },
   { to: "/patient", label: "Patient view", short: "Patient", icon: UserRound, tiny: "max-[359px]:hidden" }, // no room on 320 px phones
 ];
