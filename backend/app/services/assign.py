@@ -85,7 +85,10 @@ def pick_doctor(conditions: list[str], level: str, doctors: list[DoctorLoad]) ->
     if best.specialty == want:
         why = f"{want}" + (f" for {because.lower()}" if because else "")
     elif best.specialty == GENERAL:
-        why = f"General Medicine (no {want.lower()} doctor free)" if want != GENERAL else "General Medicine"
+        has = any(d.specialty == want for d in on)
+        why = ("General Medicine" if want == GENERAL
+               else f"General Medicine ({want.lower()} doctors here are full)" if has
+               else f"General Medicine (no {want.lower()} doctor on duty here)")
     else:
         why = f"{best.specialty} (closest free doctor)"
     load = f"{len(best.levels)} patient{'s' if len(best.levels) != 1 else ''}"
