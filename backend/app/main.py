@@ -88,3 +88,31 @@ def health():
 @app.get("/", include_in_schema=False)
 def root():
     return {"name": "AYU API", "docs": "/docs", "health": "/health"}
+
+
+# ---------------------------------------------------------------- the web app, from the same server
+# When frontend/dist exists (npm run build), the API also serves the app, so one address — a deployed
+# link or the laptop's Wi-Fi address — gives both. A browser opening /patients/P003 gets the page;
+# the app's own requests (Accept: application/json) get the API.
+
+from pathlib import Path  # noqa: E402
+
+from fastapi import Request  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+
+DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+API_ONLY = ("/docs", "/redoc", "/openapi.json", "/ws/")
+
+if (DIST / "index.html").exists():
+
+    @app.middleware("http")
+    async def spa(request: Request, call_next):
+        path = request.url.path
+        if request.method == "GET" and not path.startswith(API_ONLY):
+            file = (DIST / path.lstrip("/")).resolve()
+            if path != "/" and file.is_file() and DIST in file.parents:
+                return FileResponse(file)
+            if "text/html" in request.headers.get("accept", ""):
+                # The same URL is also an API route: never let a browser cache reuse this page for the app's JSON request.
+                return FileResponse(DIST / "index.html", headers={"Cache-Control": "no-store", "Vary": "Accept"})
+        return await call_next(request)

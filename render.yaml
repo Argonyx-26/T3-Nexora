@@ -1,0 +1,10 @@
+# Render blueprint: one web service (API + app) from the Dockerfile.
+services:
+  - type: web
+    name: ayu
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false   # paste it in the Render dashboard; never commit it
