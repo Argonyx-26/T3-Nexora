@@ -1,21 +1,22 @@
 import { motion } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, ClipboardList, History, ListChecks, Microscope, Pill, ShieldPlus, Siren, Stethoscope, Target, TrendingUp, type LucideIcon } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Activity, ChartSpline, ClipboardList, History, LayoutGrid, ListChecks, Microscope, NotebookPen, Pill, ShieldPlus, Siren, Stethoscope, Target, TrendingUp, type LucideIcon } from "lucide-react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertCard, AlertToaster, LiveStatus } from "../components/alerts";
 import { ExplanationCard } from "../components/ExplanationCard";
 import { VITAL_ICON, ic } from "../components/icons";
 import { BeatingHeart, PulseStrip } from "../components/PageArt";
+import { DoctorTimeline, HistoryCard, InsightStrip, MedicationCalendar, MentalHealthCard, NotesAndCare, RecentChanges, TREND_RANGES, TrendExplorer, type TrendRange } from "../components/DoctorKit";
 import { Shell } from "../components/Shell";
 import { VitalChart } from "../components/VitalChart";
 import { Card, EmptyState, ErrorState, Eyebrow, RiskBadge, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
 import { useLive } from "../lib/live";
-import { DISCLAIMER, LEVEL_STYLE, VITALS, fmtDay, fmtTime, fmtVital, istDateKey } from "../lib/format";
-import type { Factor, Level, Medication, Risk, VitalKey } from "../lib/types";
+import { DISCLAIMER, LEVEL_STYLE, VITALS, fmtTime, fmtVital } from "../lib/format";
+import type { Factor, Level, Risk, VitalKey } from "../lib/types";
 
-const RANGES = ["6h", "24h", "7d"] as const;
+const RANGES = TREND_RANGES;
 
 /** Run `fn` when `value` changes, at most once per `minMs` (trailing call guaranteed). */
 function useThrottledOnChange(value: unknown, minMs: number, fn: () => void) {
@@ -43,9 +44,22 @@ function useThrottledOnChange(value: unknown, minMs: number, fn: () => void) {
 }
 const EASE = [0.22, 1, 0.36, 1] as const;
 
+const TABS = [
+  { key: "overview", label: "Overview", icon: LayoutGrid },
+  { key: "trends", label: "Trends", icon: ChartSpline },
+  { key: "meds", label: "Medications", icon: Pill },
+  { key: "timeline", label: "Timeline", icon: History },
+  { key: "notes", label: "Notes & care", icon: NotebookPen },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
 export default function PatientDetail() {
   const { id = "" } = useParams();
-  const [range, setRange] = useState<(typeof RANGES)[number]>("6h");
+  const [range, setRange] = useState<TrendRange>("24h");
+  const [params, setParams] = useSearchParams();
+  const tab = (TABS.some((x) => x.key === params.get("tab")) ? params.get("tab") : "overview") as TabKey;
+  const setTab = (k: TabKey) => setParams((prev) => { const n = new URLSearchParams(prev); n.set("tab", k); return n; }, { replace: true });
+  const insights = useQuery((s) => api.insights(id, s), [id], 30_000);
   const patient = useQuery((s) => api.patient(id, s), [id], 30_000);
   const risk = useQuery((s) => api.risk(id, s), [id], 30_000);
   const vitals = useQuery((s) => api.vitals(id, range, 500, s), [id, range], 60_000);
@@ -63,6 +77,7 @@ export default function PatientDetail() {
     vitals.reload();
   });
   useThrottledOnChange(tick, 6000, () => {
+    insights.reload();
     history.reload();
     meds.reload();
     symptoms.reload();
@@ -146,8 +161,28 @@ export default function PatientDetail() {
           </div>
         )}
 
+        <div className="mt-6">
+          <InsightStrip ins={insights.data} risk={r} />
+        </div>
+
+        {/* Profile tabs */}
+        <nav className="sticky top-16 z-20 -mx-4 mt-6 overflow-x-auto border-b border-line bg-bg/85 px-4 backdrop-blur-xl sm:-mx-8 sm:px-8" aria-label="Patient profile">
+          <div className="flex min-w-max gap-1">
+            {TABS.map((tb) => (
+              <button key={tb.key} type="button" onClick={() => setTab(tb.key)} aria-current={tab === tb.key ? "page" : undefined}
+                className={cx("relative inline-flex h-12 items-center gap-2 px-3.5 text-[14px] transition-colors", tab === tb.key ? "text-ink" : "text-muted hover:text-ink")}>
+                <tb.icon {...ic(15)} />{tb.label}
+                {tb.key === "meds" && (insights.data?.missed_patterns.length ?? 0) > 0 && <span className="size-1.5 rounded-full bg-watch" />}
+                {tab === tb.key && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-teal" />}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        {tab === "overview" && (
+          <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
         {/* Action + why */}
-        <div className="mt-10 grid gap-4 lg:grid-cols-[380px_1fr] [&>*]:min-w-0">
+        <div className="mt-6 grid gap-4 lg:grid-cols-[380px_1fr] [&>*]:min-w-0">
           <ActionCard risk={r} />
           <FactorsCard risk={r} />
         </div>
@@ -156,41 +191,14 @@ export default function PatientDetail() {
           <ExplanationCard patientId={id} level={r?.level} score={r?.score} />
         </div>
 
-        {/* Vitals */}
-        <section className="mt-14">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <Eyebrow icon={Activity}>Vitals</Eyebrow>
-              <h2 className="mt-2 font-display text-[36px] leading-none">Against this patient's own normal</h2>
-              <p className="mt-2 text-[13px] text-muted">Shaded band: this patient's baseline ± 2.5σ. Dashed lines: where NEWS2 starts adding points.</p>
-            </div>
-            <div className="flex gap-1 rounded-full border border-line p-1">
-              {RANGES.map((rg) => (
-                <button key={rg} type="button" onClick={() => setRange(rg)} className={cx("h-8 rounded-full px-4 font-mono text-[12px] transition-colors duration-200", range === rg ? "bg-ink text-bg" : "text-muted hover:text-ink")}>
-                  {rg}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
-            {(["hr", "spo2", "sbp", "rr", "temp", "glucose"] as VitalKey[]).map((k) => (
-              <VitalPanel key={k} vital={k} risk={r} loading={!vitals.data} error={vitals.error}>
-                {vitals.data && (
-                  <VitalChart
-                    vital={k}
-                    data={vitals.data}
-                    baseline={r?.baselines[k]}
-                    spo2Scale={p?.spo2_scale}
-                    second={k === "sbp" ? { key: "dbp", baseline: r?.baselines.dbp } : undefined}
-                  />
-                )}
-              </VitalPanel>
-            ))}
-          </div>
-        </section>
 
+            <div className="mt-4 grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
+              <RecentChanges ins={insights.data} risk={r} />
+              <MentalHealthCard ins={insights.data} />
+              <HistoryCard p={p} />
+            </div>
         {/* Risk timeline + NEWS2 */}
-        <section className="mt-14 grid gap-4 lg:grid-cols-[1fr_380px] [&>*]:min-w-0">
+        <section className="mt-4 grid gap-4 lg:grid-cols-[1fr_380px] [&>*]:min-w-0">
           <Card className="p-6">
             <Eyebrow icon={History}>Risk timeline · 24 h</Eyebrow>
             <div className="mt-4">
@@ -224,9 +232,8 @@ export default function PatientDetail() {
           <News2Card risk={r} />
         </section>
 
-        {/* Medication + symptoms */}
-        <section className="mt-14 grid gap-4 lg:grid-cols-[1fr_380px] [&>*]:min-w-0">
-          <MedsCard meds={meds.data} error={meds.error} onRetry={meds.reload} adherence={r?.adherence.pct ?? null} />
+
+            <div className="mt-4">
           <Card className="p-6">
             <Eyebrow icon={ClipboardList}>Symptom log · 7 days</Eyebrow>
             <div className="mt-4">
@@ -258,7 +265,66 @@ export default function PatientDetail() {
               )}
             </div>
           </Card>
+            </div>
+          </motion.div>
+        )}
+
+        {tab === "trends" && (
+          <motion.div key="trends" className="mt-6" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+            <TrendExplorer data={vitals.data} risk={r} range={range} setRange={setRange} />
+        {/* Vitals */}
+        <section className="mt-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <Eyebrow icon={Activity}>Vitals</Eyebrow>
+              <h2 className="mt-2 font-display text-[36px] leading-none">Against this patient's own normal</h2>
+              <p className="mt-2 text-[13px] text-muted">Shaded band: this patient's baseline ± 2.5σ. Dashed lines: where NEWS2 starts adding points.</p>
+            </div>
+            <div className="flex gap-1 rounded-full border border-line p-1">
+              {RANGES.map((rg) => (
+                <button key={rg} type="button" onClick={() => setRange(rg)} className={cx("h-8 rounded-full px-4 font-mono text-[12px] transition-colors duration-200", range === rg ? "bg-ink text-bg" : "text-muted hover:text-ink")}>
+                  {rg}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
+            {(["hr", "spo2", "sbp", "rr", "temp", "glucose"] as VitalKey[]).map((k) => (
+              <VitalPanel key={k} vital={k} risk={r} loading={!vitals.data} error={vitals.error}>
+                {vitals.data && (
+                  <VitalChart
+                    vital={k}
+                    data={vitals.data}
+                    baseline={r?.baselines[k]}
+                    spo2Scale={p?.spo2_scale}
+                    second={k === "sbp" ? { key: "dbp", baseline: r?.baselines.dbp } : undefined}
+                  />
+                )}
+              </VitalPanel>
+            ))}
+          </div>
         </section>
+
+          </motion.div>
+        )}
+
+        {tab === "meds" && (
+          <motion.div key="meds" className="mt-6" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+            <MedicationCalendar meds={meds.data} ins={insights.data} risk={r} now={p?.latest.ts} />
+          </motion.div>
+        )}
+
+        {tab === "timeline" && (
+          <motion.div key="timeline" className="mt-6" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+            <DoctorTimeline patientId={id} p={p} />
+          </motion.div>
+        )}
+
+        {tab === "notes" && (
+          <motion.div key="notes" className="mt-6" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+            <NotesAndCare patientId={id} />
+          </motion.div>
+        )}
       </div>
     </Shell>
   );
@@ -434,77 +500,3 @@ function News2Card({ risk }: { risk?: Risk }) {
   );
 }
 
-function MedsCard({ meds, error, onRetry, adherence }: { meds?: Medication[]; error?: Error; onRetry: () => void; adherence: number | null }) {
-  const days = useMemo(() => {
-    const keys = new Set<string>();
-    meds?.forEach((m) => m.doses.forEach((d) => keys.add(istDateKey(d.scheduled_at))));
-    return [...keys].sort().slice(-8);
-  }, [meds]);
-  return (
-    <Card className="p-6">
-      <div className="flex items-baseline justify-between">
-        <Eyebrow icon={Pill}>Medication adherence · 7 days</Eyebrow>
-        {adherence !== null && <span className="font-mono text-[13px] tnum">{adherence.toFixed(0)}% taken</span>}
-      </div>
-      {error && !meds ? (
-        <div className="mt-4"><ErrorState error={error} onRetry={onRetry} /></div>
-      ) : !meds ? (
-        <Skeleton className="mt-4 h-40" />
-      ) : meds.length === 0 ? (
-        <div className="mt-4"><EmptyState title="No medicines on record" /></div>
-      ) : (
-        <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[560px] text-[13px]">
-            <thead>
-              <tr>
-                <th className="pb-2 text-left font-normal" />
-                {days.map((d) => (
-                  <th key={d} className="pb-2 text-center font-mono text-[10px] font-normal tracking-wide text-muted">{fmtDay(`${d}T06:30:00Z`)}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {meds.map((m) => (
-                <tr key={m.id} className="border-t border-line">
-                  <td className="py-3 pr-4">
-                    <div className="font-medium">{m.name} <span className="font-normal text-muted">{m.dose}</span></div>
-                    <div className="text-[11px] text-muted">
-                      {m.purpose} · {m.times.join(", ")}
-                      {m.critical && <span className="ml-1.5 text-critical">critical</span>}
-                    </div>
-                  </td>
-                  {days.map((d) => {
-                    const doses = m.doses.filter((x) => istDateKey(x.scheduled_at) === d);
-                    return (
-                      <td key={d} className="py-3 text-center">
-                        <div className="inline-flex gap-1">
-                          {doses.map((x) => (
-                            <span
-                              key={x.id}
-                              title={`${fmtTime(x.scheduled_at)} · ${x.status}`}
-                              className={cx(
-                                "size-3 rounded-[4px]",
-                                x.status === "taken" && "bg-teal",
-                                x.status === "missed" && "bg-critical",
-                                x.status === "pending" && "border border-line-2",
-                              )}
-                            />
-                          ))}
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="mt-3 flex gap-4 text-[11px] text-muted">
-            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-teal" />Taken</span>
-            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-critical" />Missed</span>
-            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] border border-line-2" />Upcoming</span>
-          </div>
-        </div>
-      )}
-    </Card>
-  );
-}

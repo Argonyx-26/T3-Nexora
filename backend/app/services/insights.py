@@ -77,7 +77,7 @@ def data_quality(history: list, now: datetime, risk: RiskResult) -> Quality:
 def confidence(risk: RiskResult, q: Quality) -> tuple[int, list[str]]:
     """0–100, higher = more sure the level is right. A heuristic, shown with its reasons."""
     reasons = []
-    pts = 50.0
+    pts = 40.0
     dq = {"Good": 25, "Fair": 12, "Poor": 0}[q.label]
     pts += dq
     reasons.append(f"{q.label.lower()} data quality (+{dq})")
@@ -93,7 +93,7 @@ def confidence(risk: RiskResult, q: Quality) -> tuple[int, list[str]]:
     if any(f.kind == "escalation" for f in risk.factors):
         pts += 10
         reasons.append("set by a hospital rule (NEWS2 / qSOFA / red-flag symptom) (+10)")
-    return int(max(35, min(97, round(pts)))), reasons
+    return int(max(35, min(95, round(pts)))), reasons
 
 
 def sudden_changes(history: list, now: datetime, spo2_scale: int = 1) -> list[dict]:
@@ -147,16 +147,16 @@ def missed_patterns(doses: list[tuple[str, bool, datetime, str]], now: datetime)
             out.append({"kind": "time", "medicine": med, "slot": hhmm, "missed": m, "total": len(statuses),
                         "text": f"{med} at {hhmm} missed {m} of {len(statuses)} times"})
 
-    # the same weekdays
+    # the same weekdays — only if the misses fall on at least two different dates (one bad morning is not a pattern)
     by_day = Counter(WEEKDAYS[(d[2] + IST).weekday()] for d in missed)
     heavy = [day for day, n in by_day.items() if n >= 2]
-    if heavy and sum(by_day[d] for d in heavy) / len(missed) >= 0.6 and len(heavy) <= 3:
+    on_heavy = [d for d in missed if WEEKDAYS[(d[2] + IST).weekday()] in heavy]
+    dates = {(d[2] + IST).date() for d in on_heavy}
+    if heavy and len(dates) >= 2 and len(on_heavy) / len(missed) >= 0.6 and len(heavy) <= 3:
         days = sorted(heavy, key=WEEKDAYS.index)
-        slots_missed = Counter((d[2] + IST).strftime("%H:%M") for d in missed if WEEKDAYS[(d[2] + IST).weekday()] in heavy)
-        when = " & ".join(days)
-        at = slots_missed.most_common(1)[0][0]
-        out.append({"kind": "weekday", "days": days, "missed": sum(by_day[d] for d in heavy),
-                    "text": f"Doses missed mostly on {when} (usually the {at} dose)"})
+        at = Counter((d[2] + IST).strftime("%H:%M") for d in on_heavy).most_common(1)[0][0]
+        out.append({"kind": "weekday", "days": days, "missed": len(on_heavy), "critical": any(d[1] for d in on_heavy),
+                    "text": f"Doses missed mostly on {' & '.join(days)} (usually the {at} dose)"})
 
     # runs of consecutive misses, per medicine
     per_med: dict[str, list[str]] = defaultdict(list)

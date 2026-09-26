@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Activity,
   BatteryFull,
+  CalendarDays,
   BatteryLow,
   BatteryMedium,
   BellRing,
@@ -615,6 +616,7 @@ export function CareTeam({ patientId, lang, ward, bed }: { patientId: string; la
 type Filter = "all" | TimelineEvent["kind"];
 const KIND_ICON: Record<TimelineEvent["kind"], LucideIcon> = {
   status: Activity, symptom: ClipboardList, dose: Pill, reading: NotebookPen, alert: BellRing, checkin: CalendarHeart,
+  note: Stethoscope, appointment: CalendarDays,
 };
 
 function eventView(e: TimelineEvent, lang: Lang): { title: string; detail?: string; tone: Tone; icon: LucideIcon } {
@@ -657,6 +659,23 @@ function eventView(e: TimelineEvent, lang: Lang): { title: string; detail?: stri
       if (e.sub === "resolved") return { title: hi ? "टीम ने अलर्ट बंद किया" : "Care team closed the alert", tone: "stable", icon: CircleCheck };
       if (e.sub === "escalated") return { title: hi ? `अलर्ट बढ़कर ${L(e.level)}` : `Alert raised to ${L(e.level)}`, tone: levelTone(e.level), icon: KIND_ICON.alert };
       return { title: hi ? `AYU ने टीम को सूचित किया (${L(e.level)})` : `AYU alerted your care team (${L(e.level)})`, tone: levelTone(e.level), icon: KIND_ICON.alert };
+    case "note":
+      return {
+        title: e.sub === "followup" ? (hi ? "डॉक्टर के निर्देश" : "Follow-up from your doctor") : (hi ? "डॉक्टर का नोट" : "Note from your doctor"),
+        detail: [e.by, e.note].filter(Boolean).join(" · "), tone: "teal", icon: KIND_ICON.note,
+      };
+    case "appointment": {
+      const st: Record<string, [string, string]> = {
+        requested: ["Appointment requested", "अपॉइंटमेंट का अनुरोध"], confirmed: ["Appointment confirmed", "अपॉइंटमेंट पक्का"],
+        declined: ["Appointment declined", "अपॉइंटमेंट अस्वीकार"], done: ["Appointment done", "अपॉइंटमेंट पूरा"],
+      };
+      const [en, hiT] = st[e.sub] ?? st.requested;
+      return {
+        title: hi ? hiT : en,
+        detail: [e.source === "video" ? (hi ? "वीडियो" : "Video") : (hi ? "अस्पताल में" : "In person"), e.note].filter(Boolean).join(" · "),
+        tone: e.sub === "declined" ? "muted" : "violet", icon: KIND_ICON.appointment,
+      };
+    }
     case "checkin": {
       const m = MOODS[(e.mood ?? 3) - 1];
       return {
@@ -671,7 +690,7 @@ function eventView(e: TimelineEvent, lang: Lang): { title: string; detail?: stri
 export function HealthTimeline({ patientId, lang, now, version }: { patientId: string; lang: Lang; now?: string; version: number }) {
   const t = C[lang];
   const reduce = useReducedMotion();
-  const q = useQuery((s) => api.timeline(patientId, 48, s), [patientId, version]);
+  const q = useQuery((s) => api.timeline(patientId, 48, s, "patient"), [patientId, version]);
   const [filter, setFilter] = useState<Filter>("all");
   const [limit, setLimit] = useState(25);
   const filters: { f: Filter; label: string; icon?: LucideIcon }[] = [
@@ -740,6 +759,102 @@ export function HealthTimeline({ patientId, lang, now, version }: { patientId: s
           )}
         </div>
       )}
+    </Section>
+  );
+}
+
+/* ------------------------------------------------------------------ 6 · From your doctor (notes, follow-ups, appointments) */
+
+const D = {
+  en: {
+    title: "From your doctor", none: "No notes yet. Your doctor's notes and follow-up instructions will appear here.",
+    followup: "Follow-up", on: "by", request: "Request an appointment", reason: "What would you like to discuss?", when: "When suits you? (e.g. tomorrow morning)",
+    inPerson: "In person", video: "Video", send: "Send request", sent: "Request sent — your care team will confirm.",
+    requested: "Requested", confirmed: "Confirmed", declined: "Declined", done: "Done", join: "Join video consult",
+  },
+  hi: {
+    title: "आपके डॉक्टर से", none: "अभी कोई नोट नहीं। डॉक्टर के नोट और आगे के निर्देश यहाँ दिखेंगे।",
+    followup: "आगे के निर्देश", on: "तक", request: "अपॉइंटमेंट माँगें", reason: "आप किस बारे में बात करना चाहते हैं?", when: "कब ठीक रहेगा? (जैसे कल सुबह)",
+    inPerson: "अस्पताल में", video: "वीडियो", send: "अनुरोध भेजें", sent: "अनुरोध भेज दिया — टीम पुष्टि करेगी।",
+    requested: "अनुरोध किया", confirmed: "पक्का", declined: "अस्वीकार", done: "पूरा", join: "वीडियो कॉल से जुड़ें",
+  },
+};
+
+export function DoctorMessages({ patientId, lang, version }: { patientId: string; lang: Lang; version: number }) {
+  const t = D[lang];
+  const notes = useQuery((s) => api.notes(patientId, true, s), [patientId, version]);
+  const appts = useQuery((s) => api.appointments(patientId, s), [patientId, version]);
+  const [reason, setReason] = useState("");
+  const [when, setWhen] = useState("");
+  const [mode, setMode] = useState<"in_person" | "video">("in_person");
+  const [msg, setMsg] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const send = async () => {
+    setBusy(true);
+    try {
+      await api.requestAppointment(patientId, { reason, preferred: when, mode, requested_by: "patient" });
+      setReason("");
+      setWhen("");
+      setMsg(t.sent);
+      appts.reload();
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Section icon={Stethoscope} title={t.title}>
+      <div className="mt-4 grid gap-5 lg:grid-cols-[1.2fr_1fr]">
+        <div>
+          {!notes.data ? <Skeleton className="h-24" /> : notes.data.length === 0 ? <p className="text-[13px] text-muted">{t.none}</p> : (
+            <ul className="space-y-2">
+              {notes.data.slice(0, 4).map((n) => (
+                <motion.li key={n.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                  className={cx("rounded-2xl p-4", n.kind === "followup" ? "bg-violet-soft" : "bg-surface-2")}>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                    {n.kind === "followup" && <span className="rounded-full bg-surface px-2 py-0.5 text-violet">{t.followup}{n.follow_up_on ? ` · ${t.on} ${n.follow_up_on}` : ""}</span>}
+                    <span className="ml-auto">{n.author} · {fmtTime(n.ts)}</span>
+                  </div>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-ink">{n.text}</p>
+                </motion.li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="rounded-2xl border border-line p-4">
+          <div className="text-[13px] font-medium">{t.request}</div>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder={t.reason} aria-label={t.reason}
+            className="mt-3 h-11 w-full rounded-full border border-line bg-bg px-4 text-[14px] outline-none focus:border-line-2" />
+          <input value={when} onChange={(e) => setWhen(e.target.value)} maxLength={120} placeholder={t.when} aria-label={t.when}
+            className="mt-2 h-11 w-full rounded-full border border-line bg-bg px-4 text-[14px] outline-none focus:border-line-2" />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="flex rounded-full border border-line p-1">
+              {(["in_person", "video"] as const).map((m) => (
+                <button key={m} type="button" onClick={() => setMode(m)} aria-pressed={mode === m}
+                  className={cx("h-8 rounded-full px-3 text-[12px]", mode === m ? "bg-ink text-bg" : "text-muted")}>{m === "video" ? t.video : t.inPerson}</button>
+              ))}
+            </div>
+            <button type="button" onClick={send} disabled={busy} className="ml-auto inline-flex h-10 items-center gap-2 rounded-full bg-ink px-4 text-[13px] font-medium text-bg hover:bg-teal disabled:opacity-50">
+              <Send size={14} aria-hidden />{t.send}
+            </button>
+          </div>
+          {msg && <p className="mt-2 text-[12px] text-stable" role="status">{msg}</p>}
+          {appts.data && appts.data.length > 0 && (
+            <ul className="mt-4 space-y-2 border-t border-line pt-3">
+              {appts.data.slice(0, 3).map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                  <span className={cx("rounded-full px-2 py-0.5 text-[11px]", a.status === "confirmed" ? "bg-teal-soft text-teal" : a.status === "requested" ? "bg-watch-soft text-watch" : "bg-surface-2 text-muted")}>{t[a.status]}</span>
+                  <span className="text-ink-2">{a.mode === "video" ? t.video : t.inPerson}{a.scheduled_for ? ` · ${fmtTime(a.scheduled_for)}` : a.preferred ? ` · ${a.preferred}` : ""}</span>
+                  {a.status === "confirmed" && a.video_url && (
+                    <a href={a.video_url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full bg-violet px-3 text-[12px] font-medium text-white">{t.join}</a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </Section>
   );
 }

@@ -77,6 +77,7 @@ export interface Patient {
   spo2_scale: number;
   normals: Record<string, { mean: number; std: number }>;
   notes: string;
+  history: { year: string; event: string }[];
 }
 
 export interface PatientSummary extends Patient {
@@ -191,7 +192,7 @@ export interface Checkin {
 
 export interface TimelineEvent {
   ts: string;
-  kind: "status" | "symptom" | "dose" | "reading" | "alert" | "checkin";
+  kind: "status" | "symptom" | "dose" | "reading" | "alert" | "checkin" | "note" | "appointment";
   sub: string;
   level: Level | null;
   prev_level: string | null;
@@ -267,4 +268,98 @@ export interface ChatReply {
   source: "safety" | "gemini" | "builtin";
   model: string | null;
   disclaimer: string;
+}
+
+export interface SuddenChange {
+  vital: string;
+  label: string;
+  unit: string;
+  from: number | null;
+  to: number;
+  delta: number | null;
+  sudden: boolean;
+  abnormal: boolean;
+  severity: "High" | "Moderate";
+}
+
+export interface MissedPattern {
+  kind: "time" | "weekday" | "streak" | "critical";
+  text: string;
+  medicine?: string;
+  slot?: string;
+  days?: string[];
+  missed?: number;
+  total?: number;
+}
+
+export interface Quality {
+  label: "Good" | "Fair" | "Poor";
+  completeness: number;
+  last_reading_min: number;
+  baseline_coverage: number;
+  notes: string[];
+}
+
+export interface Insights {
+  patient_id: string;
+  level: Level;
+  score: number;
+  confidence: number;
+  confidence_reasons: string[];
+  data_quality: Quality;
+  sudden_changes: SuddenChange[];
+  missed_patterns: MissedPattern[];
+  mood: {
+    count: number; mood_avg: number | null; sleep_avg: number | null; energy_avg: number | null;
+    last: { ts: string; mood: number; energy: number; sleep: number } | null;
+    series: { ts: string; mood: number; energy: number; sleep: number }[];
+  };
+  mood_changes: { kind: string; severity: string; text: string }[];
+  needs_review: string[];
+}
+
+export type Priority = "Critical" | "High" | "Moderate";
+
+export interface QueueItem {
+  patient_id: string;
+  name: string;
+  bed: string;
+  ward: string;
+  priority: Priority | null;
+  level: Level;
+  score: number;
+  news2: number;
+  confidence: number;
+  data_quality: Quality["label"];
+  factors: { headline: string; kind: string; factor: string; message: string; contribution: number }[];
+  sudden_changes: SuddenChange[];
+  missed_patterns: MissedPattern[];
+  mood_changes: { kind: string; severity: string; text: string }[];
+  needs_review: string[];
+  alert: { id: number; status: string; level: Level; created_at: string; acknowledged_by: string } | null;
+}
+
+export interface DoctorNote {
+  id: number;
+  ts: string;
+  author: string;
+  kind: "note" | "followup";
+  text: string;
+  visible: boolean;
+  follow_up_on: string;
+}
+
+export interface Appointment {
+  id: number;
+  patient_id: string;
+  patient_name: string;
+  bed: string;
+  created_at: string;
+  requested_by: "patient" | "doctor";
+  reason: string;
+  preferred: string;
+  mode: "in_person" | "video";
+  status: "requested" | "confirmed" | "declined" | "done";
+  scheduled_for: string | null;
+  video_url: string;
 }

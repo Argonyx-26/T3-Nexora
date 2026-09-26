@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AlertItem, ChatReply, ChatTurn, Checkin, TimelineEvent, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
+import type { AlertItem, Appointment, ChatReply, ChatTurn, Checkin, DoctorNote, Insights, QueueItem, TimelineEvent, EvalResult, Explanation, Medication, ReadingSource, VitalsInput, PatientSummary, Risk, RiskPoint, ScenarioInfo, SimState, SymptomLog, Vital } from "./types";
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "http://127.0.0.1:8000";
 
@@ -48,7 +48,19 @@ export const api = {
   checkins: (id: string, s?: AbortSignal) => get<Checkin[]>(`/patients/${id}/checkins`, s),
   addCheckin: (id: string, body: { mood: number; energy: number; sleep: number; note?: string; symptoms?: string[]; source?: ReadingSource }) =>
     post<Checkin>(`/patients/${id}/checkins`, body),
-  timeline: (id: string, hours = 48, s?: AbortSignal) => get<TimelineEvent[]>(`/patients/${id}/timeline?hours=${hours}`, s),
+  timeline: (id: string, hours = 48, s?: AbortSignal, audience: "doctor" | "patient" = "doctor") =>
+    get<TimelineEvent[]>(`/patients/${id}/timeline?hours=${hours}&audience=${audience}`, s),
+  insights: (id: string, s?: AbortSignal) => get<Insights>(`/patients/${id}/insights`, s),
+  queue: (s?: AbortSignal) => get<QueueItem[]>("/insights", s),
+  notes: (id: string, visibleOnly = false, s?: AbortSignal) => get<DoctorNote[]>(`/patients/${id}/notes?visible_only=${visibleOnly}`, s),
+  addNote: (id: string, body: { text: string; kind?: "note" | "followup"; visible?: boolean; follow_up_on?: string; author?: string }) =>
+    post<DoctorNote>(`/patients/${id}/notes`, body),
+  appointments: (id: string, s?: AbortSignal) => get<Appointment[]>(`/patients/${id}/appointments`, s),
+  wardAppointments: (status = "all", s?: AbortSignal) => get<Appointment[]>(`/appointments?status=${status}`, s),
+  requestAppointment: (id: string, body: { reason?: string; preferred?: string; mode?: "in_person" | "video"; requested_by?: "patient" | "doctor" }) =>
+    post<Appointment>(`/patients/${id}/appointments`, body),
+  updateAppointment: (apptId: number, body: { status?: Appointment["status"]; mode?: Appointment["mode"]; scheduled_for?: string }) =>
+    post<Appointment>(`/appointments/${apptId}`, body),
   patientAlerts: (id: string, s?: AbortSignal) => get<AlertItem[]>(`/alerts?status=all&patient_id=${id}&limit=20`, s),
   recordDose: (doseId: number, status: "taken" | "missed") => post<Risk>("/doses", { dose_id: doseId, status }),
   explanation: (id: string, lang: "en" | "hi", s?: AbortSignal) => get<Explanation>(`/patients/${id}/explanation?lang=${lang}`, s),

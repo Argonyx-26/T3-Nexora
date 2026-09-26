@@ -1,5 +1,5 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
-import { BellRing, Search, Siren, TriangleAlert, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, BellRing, LayoutGrid, Rows3, Search, Siren, TriangleAlert, Users, type LucideIcon } from "lucide-react";
 import { forwardRef, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertToaster, AlertsPanel, LiveStatus } from "../components/alerts";
@@ -12,7 +12,7 @@ import { EmptyState, ErrorState, Eyebrow, LevelDot, RiskBadge, Skeleton, cx } fr
 import { api, useQuery } from "../lib/api";
 import { useLive } from "../lib/live";
 import { LEVELS, LEVEL_STYLE, fmtVital } from "../lib/format";
-import type { Level, PatientSummary, Vital, VitalKey } from "../lib/types";
+import type { Level, PatientSummary, QueueItem, Vital, VitalKey } from "../lib/types";
 
 const RANK: Record<Level, number> = { Stable: 0, Watch: 1, Warning: 2, Critical: 3 };
 const POLL_MS = 30_000; // static details; live values come over the WebSocket
@@ -45,6 +45,8 @@ export default function Doctor() {
   );
 
   const [filter, setFilter] = useState<Level | "All">("All");
+  const [view, setView] = useState<"cards" | "table">("cards");
+  const queue = useQuery((s) => api.queue(s), [], 30_000);
   const [q, setQ] = useState("");
 
   const live = useLive();
@@ -131,6 +133,15 @@ export default function Doctor() {
               </button>
             ))}
           </div>
+          <div className="flex items-center gap-2">
+          <div className="flex rounded-full border border-line p-1" role="group" aria-label="View">
+            {([["cards", LayoutGrid, "Cards"], ["table", Rows3, "Table"]] as const).map(([v, Icon, label]) => (
+              <button key={v} type="button" onClick={() => setView(v)} aria-pressed={view === v}
+                className={cx("inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] transition-colors", view === v ? "bg-ink text-bg" : "text-muted hover:text-ink")}>
+                <Icon size={13} aria-hidden />{label}
+              </button>
+            ))}
+          </div>
           <label className="relative block w-full sm:w-72">
             <Search {...ic(15)} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" />
             <input
@@ -141,6 +152,7 @@ export default function Doctor() {
               className="h-10 w-full rounded-full border border-line bg-surface pr-4 pl-10 text-[14px] outline-none transition-colors placeholder:text-faint focus:border-line-2"
             />
           </label>
+          </div>
         </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
@@ -154,6 +166,8 @@ export default function Doctor() {
               </div>
             ) : shown.length === 0 ? (
               <EmptyState title="No patients match">Try another level or clear the search.</EmptyState>
+            ) : view === "table" ? (
+              <RecordsTable rows={shown} queue={queue.data} />
             ) : (
               <LayoutGroup>
                 <motion.div layout className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
@@ -281,3 +295,59 @@ const PatientCard = forwardRef<HTMLDivElement, { p: PatientSummary; vitals?: Vit
     </motion.div>
   );
 });
+
+/** Patient records: every assigned patient in one sortable-by-risk table. */
+function RecordsTable({ rows, queue }: { rows: PatientSummary[]; queue?: QueueItem[] }) {
+  const byId = Object.fromEntries((queue ?? []).map((q) => [q.patient_id, q]));
+  return (
+    <div className="overflow-x-auto rounded-3xl border border-line bg-surface">
+      <table className="w-full min-w-[900px] text-[13px]">
+        <thead>
+          <tr className="border-b border-line text-left text-[11px] tracking-wide text-muted uppercase">
+            <th className="px-4 py-3 font-normal">Patient</th>
+            <th className="px-3 py-3 font-normal">Risk</th>
+            <th className="px-3 py-3 text-right font-normal">AYU</th>
+            <th className="px-3 py-3 text-right font-normal">Confidence</th>
+            <th className="px-3 py-3 text-right font-normal">NEWS2</th>
+            <th className="px-3 py-3 text-right font-normal">HR</th>
+            <th className="px-3 py-3 text-right font-normal">SpO₂</th>
+            <th className="px-3 py-3 text-right font-normal">BP</th>
+            <th className="px-3 py-3 text-right font-normal">Temp</th>
+            <th className="px-3 py-3 font-normal">Needs review</th>
+            <th className="px-3 py-3" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((p, i) => {
+            const q = byId[p.id];
+            const s = LEVEL_STYLE[p.risk.level];
+            return (
+              <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }} className="group border-b border-line last:border-0 hover:bg-surface-2/60">
+                <td className="px-4 py-3">
+                  <Link to={`/patients/${p.id}`} className="font-medium hover:underline">{p.name}</Link>
+                  <div className="font-mono text-[11px] text-muted">{p.age} · {p.sex} · {p.bed} · {p.conditions[0]}</div>
+                </td>
+                <td className="px-3 py-3"><RiskBadge level={p.risk.level} size="sm" /></td>
+                <td className={cx("px-3 py-3 text-right font-display text-[20px] tnum", s.text)}>{p.risk.score}</td>
+                <td className="px-3 py-3 text-right font-mono tnum">
+                  {q ? <span title={`${q.data_quality} data`}>{q.confidence}% <span className={cx("text-[10px]", q.data_quality === "Good" ? "text-stable" : q.data_quality === "Fair" ? "text-watch" : "text-critical")}>●</span></span> : "—"}
+                </td>
+                <td className="px-3 py-3 text-right font-mono tnum">{p.risk.news2}</td>
+                <td className="px-3 py-3 text-right font-mono tnum">{fmtVital("hr", p.latest.hr)}</td>
+                <td className="px-3 py-3 text-right font-mono tnum">{fmtVital("spo2", p.latest.spo2)}</td>
+                <td className="px-3 py-3 text-right font-mono tnum">{fmtVital("sbp", p.latest.sbp)}/{fmtVital("dbp", p.latest.dbp)}</td>
+                <td className="px-3 py-3 text-right font-mono tnum">{fmtVital("temp", p.latest.temp)}</td>
+                <td className="max-w-[240px] px-3 py-3">
+                  {q && q.needs_review.length > 0 ? <span className="line-clamp-1 text-[12px] text-watch">{q.needs_review[0]}</span> : <span className="text-[12px] text-faint">—</span>}
+                </td>
+                <td className="px-3 py-3 text-right">
+                  <Link to={`/patients/${p.id}`} aria-label={`Open ${p.name}`} className="inline-grid size-8 place-items-center rounded-full border border-line text-muted transition-colors group-hover:border-ink group-hover:text-ink"><ArrowRight size={14} aria-hidden /></Link>
+                </td>
+              </motion.tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

@@ -90,8 +90,10 @@ def _insights(patient_id: str) -> InsightsOut:
     mood, mood_ch = mood_changes([(c.ts, c.mood, c.energy, c.sleep) for c in checkins])
     review = []
     review += [f"{c['label']} {'changed' if c['sudden'] else 'out of range'}: {c['from'] if c['from'] is not None else '—'} → {c['to']} {c['unit']}"
-               for c in changes if c["severity"] == "High" or c["sudden"]]
-    review += [p["text"] for p in patterns if p["kind"] in ("critical", "weekday", "streak")]
+               for c in changes if c["severity"] == "High" or c["sudden"] or c["abnormal"]]
+    # a pattern needs a doctor when it involves a critical medicine (non-critical ones stay on the medication tab)
+    review += [p["text"] for p in patterns if p["kind"] == "critical" or (p["kind"] == "weekday" and p.get("critical"))
+               or (p["kind"] == "streak" and p["missed"] >= 3)]
     review += [m["text"] for m in mood_ch]
     return InsightsOut(
         patient_id=patient_id, level=risk.level, score=risk.score, confidence=conf, confidence_reasons=reasons,

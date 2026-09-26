@@ -67,7 +67,7 @@ def test_mood_drop_and_poor_sleep_are_flagged():
 
 def test_patient_insights_have_confidence_quality_and_the_seeded_patterns(client):
     r = client.get("/patients/P007/insights").json()
-    assert 35 <= r["confidence"] <= 97 and r["confidence_reasons"]
+    assert 35 <= r["confidence"] <= 95 and r["confidence_reasons"]
     assert r["data_quality"]["label"] in ("Good", "Fair")
     assert any(p["kind"] in ("weekday", "time") for p in r["missed_patterns"]), r["missed_patterns"]
     assert any(m["kind"] == "mood" for m in r["mood_changes"])

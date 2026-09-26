@@ -6,7 +6,7 @@ import { HandHeart, Languages, NotebookPen, UserRound } from "lucide-react";
 import { VITAL_ICON, ic } from "../components/icons";
 import { PatientArt } from "../components/Illustrations";
 import { AdherenceTracker, AssistantChat, DailyCard, HealthSummary, Overview, Prescriptions, PulseOxTracker, WeatherCard } from "../components/PatientDashboard";
-import { CareTeam, DailyCheckin, HealthTimeline, SmartAlerts, SymptomTracker } from "../components/PatientCare";
+import { CareTeam, DailyCheckin, DoctorMessages, HealthTimeline, SmartAlerts, SymptomTracker } from "../components/PatientCare";
 import { ErrorState, Eyebrow, Skeleton, cx } from "../components/ui";
 import { api, useQuery } from "../lib/api";
 import { DISCLAIMER, initials } from "../lib/format";
@@ -236,6 +236,13 @@ export function PatientHome() {
           <div className="mt-4 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
             <SmartAlerts patientId={id} lang={l} risk={risk.data} />
             <CareTeam patientId={id} lang={l} ward={p.ward} bed={p.bed} />
+          </div>
+        )}
+
+        {/* From your doctor: visible notes, follow-ups, appointment requests and video consults */}
+        {p && (
+          <div className="mt-4">
+            <DoctorMessages patientId={id} lang={l} version={version} />
           </div>
         )}
 
