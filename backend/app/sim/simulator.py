@@ -103,6 +103,7 @@ class PState:
     open_alert_id: int | None = None
     last_alert_at: datetime | None = None
     last_alert_level: str = "Stable"
+    live: bool = True  # False for patients added from a report: no simulated vitals, doses or snapshots
 
     @property
     def id(self) -> str:
@@ -138,65 +139,83 @@ class Simulator:
             self.now = s.exec(select(func.max(VitalReading.ts))).one()
             if self.now is None:
                 raise RuntimeError("No readings in the database; seed it first")
-            since = self.now - HISTORY_KEEP
             for p in s.exec(select(Patient).order_by(col(Patient.id))).all():
-                normals = {k: (float(v["mean"]), float(v["std"])) for k, v in p.normals.items()}
-                rows = s.exec(
-                    select(VitalReading)
-                    .where(VitalReading.patient_id == p.id, VitalReading.ts >= since)
-                    .order_by(col(VitalReading.ts))
-                ).all()
-                history = deque(
-                    Reading(ts=r.ts, hr=r.hr, spo2=r.spo2, sbp=r.sbp, dbp=r.dbp, rr=r.rr, temp=r.temp,
-                            glucose=r.glucose, on_oxygen=r.on_oxygen, consciousness=r.consciousness)
-                    for r in rows
-                )
-                doses = [
-                    DoseRec(id=d.id, medication=m.name, critical=m.critical, scheduled_at=d.scheduled_at, status=d.status)
-                    for d, m in s.exec(
-                        select(DoseEvent, Medication)
-                        .join(Medication, col(DoseEvent.medication_id) == col(Medication.id))
-                        .where(DoseEvent.patient_id == p.id, DoseEvent.scheduled_at >= self.now - timedelta(days=8))
-                        .order_by(col(DoseEvent.scheduled_at))
-                    ).all()
-                ]
-                meds = [(m.id, m.name, m.critical, list(m.times)) for m in s.exec(select(Medication).where(Medication.patient_id == p.id)).all()]
-                symptoms = [
-                    SymRec(id=x.id, ts=x.ts, key=x.symptom)
-                    for x in s.exec(
-                        select(SymptomReport).where(
-                            SymptomReport.patient_id == p.id,
-                            SymptomReport.resolved_at == None,  # noqa: E711
-                            SymptomReport.ts >= self.now - timedelta(days=1),
-                        )
-                    ).all()
-                ]
-                ps = PState(
-                    info=p.model_dump(), normals=normals,
-                    gen=VitalGenerator(normals, random.Random(f"{settings.seed}-live-{p.id}")),
-                    history=history, doses=doses, symptoms=symptoms, meds=meds,
-                    dose_horizon=max((d.scheduled_at for d in doses), default=self.now),
-                )
-                self._schedule_doses(ps, s)
-                last = history[-1] if history else None
-                if last:
-                    ps.consciousness, ps.on_oxygen = last.consciousness, last.on_oxygen
-                ps.baselines = all_baselines(list(history), self.now, normals)
-                open_alert = s.exec(
-                    select(Alert).where(Alert.patient_id == p.id, Alert.status != "resolved").order_by(col(Alert.created_at).desc())
-                ).first()
-                if open_alert:
-                    ps.open_alert_id = open_alert.id
-                last_alert = s.exec(select(Alert).where(Alert.patient_id == p.id).order_by(col(Alert.created_at).desc())).first()
-                if last_alert:
-                    ps.last_alert_at, ps.last_alert_level = last_alert.created_at, last_alert.level
-                ps.risk = assess(self._ctx(ps))
-                ps.held = ps.risk.level
-                self.states[p.id] = ps
+                self.states[p.id] = self._load_patient(s, p)
             s.commit()
             self.ticks = 0
             self.loaded = True
         log.info("simulator loaded %d patients at %s", len(self.states), self.now)
+
+    def add_patient(self, patient_id: str) -> dict:
+        """Bring a newly created patient onto the live ward and score them at once."""
+        with self.lock, Session(engine) as s:
+            self.ensure_loaded()
+            p = s.get(Patient, patient_id)
+            ps = self._load_patient(s, p)
+            s.add(RiskSnapshot(patient_id=p.id, ts=self.now, score=ps.risk.score, level=ps.risk.level,
+                               news2=ps.risk.news2.total, qsofa=ps.risk.qsofa.score))
+            s.commit()
+            ps.held = "Stable"  # so a patient admitted at Watch or worse raises an alert to the doctor at once
+            self.states[p.id] = ps
+        return self.reassess(patient_id)
+
+    def _load_patient(self, s: Session, p: Patient) -> PState:
+        since = self.now - HISTORY_KEEP
+        normals = {k: (float(v["mean"]), float(v["std"])) for k, v in p.normals.items()}
+        rows = s.exec(
+            select(VitalReading)
+            .where(VitalReading.patient_id == p.id, VitalReading.ts >= since)
+            .order_by(col(VitalReading.ts))
+        ).all()
+        history = deque(
+            Reading(ts=r.ts, hr=r.hr, spo2=r.spo2, sbp=r.sbp, dbp=r.dbp, rr=r.rr, temp=r.temp,
+                    glucose=r.glucose, on_oxygen=r.on_oxygen, consciousness=r.consciousness)
+            for r in rows
+        )
+        doses = [
+            DoseRec(id=d.id, medication=m.name, critical=m.critical, scheduled_at=d.scheduled_at, status=d.status)
+            for d, m in s.exec(
+                select(DoseEvent, Medication)
+                .join(Medication, col(DoseEvent.medication_id) == col(Medication.id))
+                .where(DoseEvent.patient_id == p.id, DoseEvent.scheduled_at >= self.now - timedelta(days=8))
+                .order_by(col(DoseEvent.scheduled_at))
+            ).all()
+        ]
+        meds = [(m.id, m.name, m.critical, list(m.times)) for m in s.exec(select(Medication).where(Medication.patient_id == p.id)).all()]
+        symptoms = [
+            SymRec(id=x.id, ts=x.ts, key=x.symptom)
+            for x in s.exec(
+                select(SymptomReport).where(
+                    SymptomReport.patient_id == p.id,
+                    SymptomReport.resolved_at == None,  # noqa: E711
+                    SymptomReport.ts >= self.now - timedelta(days=1),
+                )
+            ).all()
+        ]
+        ps = PState(
+            info=p.model_dump(), normals=normals,
+            gen=VitalGenerator(normals, random.Random(f"{settings.seed}-live-{p.id}")),
+            history=history, doses=doses, symptoms=symptoms, meds=meds,
+            dose_horizon=max((d.scheduled_at for d in doses), default=self.now),
+            live=p.source != "intake",
+        )
+        if ps.live:
+            self._schedule_doses(ps, s)
+        last = history[-1] if history else None
+        if last:
+            ps.consciousness, ps.on_oxygen = last.consciousness, last.on_oxygen
+        ps.baselines = all_baselines(list(history), self.now, normals)
+        open_alert = s.exec(
+            select(Alert).where(Alert.patient_id == p.id, Alert.status != "resolved").order_by(col(Alert.created_at).desc())
+        ).first()
+        if open_alert:
+            ps.open_alert_id = open_alert.id
+        last_alert = s.exec(select(Alert).where(Alert.patient_id == p.id).order_by(col(Alert.created_at).desc())).first()
+        if last_alert:
+            ps.last_alert_at, ps.last_alert_level = last_alert.created_at, last_alert.level
+        ps.risk = assess(self._ctx(ps))
+        ps.held = ps.risk.level
+        return ps
 
     def ensure_loaded(self) -> None:
         if not self.loaded:
@@ -239,6 +258,8 @@ class Simulator:
             vital_rows, snapshot_rows = [], []
             with Session(engine) as s:
                 for ps in self.states.values():
+                    if not ps.live:
+                        continue  # a real patient from a report: nothing is simulated for them
                     self._run_scenario(ps, s)
                     self._schedule_doses(ps, s)
                     self._take_due_doses(ps, s)
@@ -471,7 +492,7 @@ class Simulator:
         with self.lock:
             ps = self.states[patient_id]
             last = ps.history[-1]
-            ts = last.ts + timedelta(minutes=1)
+            ts = max(last.ts + timedelta(minutes=1), self.now)
             merged = {v: values.get(v, getattr(last, v)) for v in ("hr", "spo2", "sbp", "dbp", "rr", "temp", "glucose")}
             ps.history.append(Reading(ts=ts, on_oxygen=ps.on_oxygen, consciousness=ps.consciousness, **merged))
             ps.sources[ts] = source

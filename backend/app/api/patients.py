@@ -357,7 +357,7 @@ def timeline(patient_id: str, hours: int = Query(48, ge=1, le=720), audience: Li
 
     manual = s.exec(
         select(VitalReading).where(VitalReading.patient_id == patient_id, VitalReading.ts >= since,
-                                   col(VitalReading.source).in_(["patient", "asha", "staff"]))
+                                   col(VitalReading.source).in_(["patient", "asha", "staff", "report"]))
     ).all()
     for v in manual:
         events.append(TimelineEvent(ts=v.ts, kind="reading", source=v.source,

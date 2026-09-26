@@ -22,6 +22,9 @@ class Patient(SQLModel, table=True):
     notes: str = ""
     # past medical history: [{"year": "2018", "event": "Type 2 diabetes diagnosed"}, ...]
     history: list[dict] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    # "demo": the simulated cohort (vitals stream every 5 min) · "intake": added by a clinician from a report or by hand —
+    # only real readings, never simulated ones
+    source: str = "demo"
 
 
 class VitalReading(SQLModel, table=True):

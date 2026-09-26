@@ -127,6 +127,7 @@ class PatientOut(BaseModel):
     normals: dict[str, dict[str, float]]
     notes: str
     history: list[dict] = Field(default_factory=list)
+    source: str = "demo"
 
 
 class PatientSummary(PatientOut):
